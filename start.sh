@@ -291,9 +291,14 @@ fi
 # Generate static nations page (runs once)
 /opt/freeciv/generate_nations.sh
 
-# Process 3: Status page generator — runs via busybox crond (started in entrypoint.sh)
-# Run once immediately so the status page is ready before the first cron tick
-/opt/freeciv/generate_status_json.sh >> /data/saves/status-generator.log 2>&1 &
+# Status page generator runs via busybox crond (started in entrypoint.sh) every 5 minutes.
+# It's also triggered by the FIFO writer after the server finishes loading (lines above).
+# Do NOT run it here — the server hasn't started yet, so it would produce incomplete data.
+
+# Symlink persisted JSON files into webroot so they're served immediately on restart
+for f in status.json history.json attendance.json diplomacy.json gazette.json; do
+  [ -f "$SAVE_DIR/$f" ] && ln -sf "$SAVE_DIR/$f" "$WEBROOT/$f"
+done
 
 # Process 4: HTTP server for status page
 busybox httpd -f -p 8080 -h /opt/freeciv/www &

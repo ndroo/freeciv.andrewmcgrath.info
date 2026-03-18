@@ -934,8 +934,9 @@ OUTPUT_JSON=$(jq -n \
 # ============================================================================
 mkdir -p "$WEBROOT"
 
-# Write status.json atomically
-echo "$OUTPUT_JSON" > "$WEBROOT/status.json.tmp"
-mv "$WEBROOT/status.json.tmp" "$WEBROOT/status.json"
+# Write status.json to persistent volume and symlink into webroot
+echo "$OUTPUT_JSON" > "$SAVE_DIR/status.json.tmp"
+mv "$SAVE_DIR/status.json.tmp" "$SAVE_DIR/status.json"
+ln -sf "$SAVE_DIR/status.json" "$WEBROOT/status.json"
 
 echo "[status-json] Generated status.json (turn ${TURN}, ${YEAR_DISPLAY})"
