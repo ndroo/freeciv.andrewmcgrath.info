@@ -2,7 +2,7 @@
 
 A self-hosted Freeciv 3.2.3 multiplayer server designed for longturn games (23-hour turns), running on Fly.io with email notifications, a live status page, and an AI-generated newspaper.
 
-**Live demo**: [freeciv.andrewmcgrath.info](https://freeciv.andrewmcgrath.info) — an active 16-player game running on this codebase.
+> **See it in action**: https://freeciv.andrewmcgrath.info — an active 16-player game running on this codebase right now.
 
 ## What is Longturn?
 
