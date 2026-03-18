@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freeciv Longturn</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0d14; --surface: #111621; --surface-2: #171d2b; --surface-3: #1e2538;
+      --border: #252d42; --text: #b0bdd0; --text-dim: #5a6a82; --text-bright: #e4eaf2;
+      --accent: #e94560; --accent-dim: rgba(233,69,96,0.12);
+      --gold: #ffd700; --silver: #b8c4d0; --bronze: #cd7f32;
+      --green: #22c55e; --green-dim: rgba(34,197,94,0.1);
+      --amber: #eab308; --blue: #3b82f6; --purple: #a78bfa; --teal: #14b8a6;
+      --chart-1: #e94560; --chart-2: #14b8a6; --chart-3: #eab308; --chart-4: #a78bfa;
+      --chart-5: #3b82f6; --chart-6: #f97316; --chart-7: #22c55e; --chart-8: #ec4899;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:var(--bg); color:var(--text); font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; line-height:1.6; -webkit-font-smoothing:antialiased; }
+    .wrap { max-width:800px; margin:0 auto; padding:0 20px; }
+    a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+    nav { background:var(--surface); border-bottom:1px solid var(--border); padding:10px 0; position:sticky; top:0; z-index:50; }
+    nav .inner { display:flex; align-items:center; justify-content:space-between; }
+    .brand { font-weight:800; font-size:15px; color:var(--text-bright); letter-spacing:-0.5px; }
+    .brand span { color:var(--accent); }
+    .nav-links { display:flex; gap:20px; font-size:12px; }
+    .nav-links a { color:var(--text-dim); text-decoration:none; text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+    .nav-links a:hover { color:var(--text-bright); }
+    .status-pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:3px 10px; border-radius:20px; font-weight:600; }
+    .status-pill.online { color:var(--green); background:var(--green-dim); }
+    .status-pill.offline { color:var(--accent); background:var(--accent-dim); }
+    .status-pill .dot { width:6px; height:6px; border-radius:50%; }
+    .status-pill.online .dot { background:var(--green); animation:pulse 2s infinite; }
+    .status-pill.offline .dot { background:var(--accent); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .hero { padding:48px 0 44px; text-align:center; background:linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%); border-bottom:1px solid var(--border); }
+    .hero .kicker { font-size:11px; text-transform:uppercase; letter-spacing:4px; color:var(--text-dim); margin-bottom:8px; }
+    .turn-num { font-size:64px; font-weight:900; color:var(--text-bright); line-height:1; letter-spacing:-2px; }
+    .year-badge { display:inline-block; background:var(--surface-2); border:1px solid var(--border); padding:4px 16px; border-radius:20px; font-size:14px; color:var(--text); margin-top:8px; font-weight:600; }
+    .countdown-section { margin-top:28px; }
+    .countdown-section .label { font-size:10px; text-transform:uppercase; letter-spacing:2px; color:var(--text-dim); margin-bottom:10px; }
+    .countdown { display:inline-flex; gap:8px; }
+    .cd-unit { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:12px 16px; min-width:72px; text-align:center; }
+    .cd-unit .val { font-size:32px; font-weight:800; color:var(--text-bright); font-variant-numeric:tabular-nums; line-height:1; }
+    .cd-unit .lbl { font-size:9px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-dim); margin-top:4px; }
+    section { padding:40px 0; } section + section { border-top:1px solid var(--border); }
+    .section-head { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
+    .section-head h2 { font-size:14px; font-weight:700; color:var(--text-bright); text-transform:uppercase; letter-spacing:1.5px; white-space:nowrap; }
+    .section-head .line { flex:1; height:1px; background:var(--border); }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th { padding:10px 8px; color:var(--text-dim); font-size:10px; text-transform:uppercase; letter-spacing:1.2px; font-weight:600; border-bottom:1px solid var(--border); text-align:center; }
+    thead th:nth-child(3) { text-align:left; }
+    tbody td { padding:14px 8px; border-bottom:1px solid rgba(37,45,66,0.5); text-align:center; transition:background .15s; }
+    tbody td:nth-child(3) { text-align:left; }
+    tbody tr:hover { background:rgba(255,255,255,0.015); }
+    .rank-col { width:40px; font-size:18px; }
+    .sub { color:var(--text-dim); font-size:11px; font-weight:400; }
+    .num { font-variant-numeric:tabular-nums; }
+    .score-gold { color:var(--gold)!important; font-weight:800; font-size:16px; }
+    .score-silver { color:var(--silver)!important; font-weight:700; font-size:15px; }
+    .score-bronze { color:var(--bronze)!important; font-weight:700; font-size:15px; }
+    .gold { color:var(--amber); }
+    .gov { color:var(--text-dim); font-size:12px; }
+    tr.rank-1 { background:var(--accent-dim); }
+    .chart-tabs { display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap; }
+    .chart-tab { background:var(--surface-2); border:1px solid var(--border); color:var(--text-dim); padding:6px 14px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; }
+    .chart-tab:hover { color:var(--text); border-color:var(--text-dim); }
+    .chart-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .chart-container { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; }
+    .chart-container canvas { width:100%!important; height:280px!important; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; }
+    .card.full { grid-column:1/-1; }
+    .card h3 { color:var(--accent); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; }
+    .card p, .card li { color:var(--text); font-size:13px; line-height:1.8; }
+    .card ul, .card ol { padding-left:18px; }
+    .card li { margin-bottom:2px; }
+    .card strong { color:var(--text-bright); }
+    .card code { background:var(--surface-3); padding:2px 6px; border-radius:4px; font-size:12px; color:var(--teal); }
+    .card .dim { color:var(--text-dim); font-size:12px; }
+    .connect-box { background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:28px; text-align:center; margin-bottom:12px; overflow:hidden; }
+    .connect-box .host { font-size:24px; font-weight:900; color:var(--accent); font-family:'SF Mono',Monaco,Consolas,monospace; letter-spacing:-0.5px; word-break:break-all; }
+    .connect-box .port { color:var(--text-dim); font-size:13px; margin-top:2px; }
+    .connect-box .badge { display:inline-block; background:var(--accent); color:#fff; padding:4px 12px; border-radius:5px; font-size:11px; font-weight:700; margin-top:10px; letter-spacing:0.5px; }
+    .spec-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(37,45,66,0.4); font-size:13px; }
+    .spec-row:last-child { border-bottom:none; }
+    .spec-label { color:var(--text-dim); }
+    .spec-value { color:var(--text-bright); font-weight:600; font-family:'SF Mono',Monaco,Consolas,monospace; font-size:12px; }
+    .status-col { width:28px; font-size:16px; text-align:center!important; }
+    .st-done { color:var(--green); }
+    .st-online { color:var(--blue); animation:pulse 2s infinite; display:inline-block; }
+    .st-seen { color:var(--purple); }
+    .st-none { color:var(--text-dim); opacity:0.3; }
+    .lastseen { color:var(--text-dim); font-size:11px; white-space:nowrap; }
+    .miss-high { color:var(--accent)!important; font-weight:700; }
+    .miss-med { color:var(--amber)!important; }
+    .miss-low { color:var(--green)!important; }
+    .idle-col { color:var(--text-dim); }
+    .dipl-rel { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; font-size:13px; }
+    .dipl-status { font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; padding:3px 10px; border-radius:4px; white-space:nowrap; }
+    .dipl-war { color:var(--accent); background:var(--accent-dim); }
+    .dipl-peace { color:var(--green); background:var(--green-dim); }
+    .dipl-alliance { color:var(--blue); background:rgba(59,130,246,0.12); }
+    .dipl-ceasefire { color:var(--amber); background:rgba(234,179,8,0.12); }
+    .dipl-armistice { color:var(--purple); background:rgba(167,139,250,0.12); }
+    .dipl-players { flex:1; color:var(--text-bright); }
+    .dipl-meta { color:var(--text-dim); font-size:11px; white-space:nowrap; }
+    .dipl-arrow { color:var(--text-dim); margin:0 4px; }
+    .hl-nav { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+    .hl-nav button { background:var(--surface-2); border:1px solid var(--border); color:var(--text); padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer; font-weight:600; }
+    .hl-nav button:hover { border-color:var(--text-dim); color:var(--text-bright); }
+    .hl-nav button:disabled { opacity:0.3; cursor:default; }
+    .hl-nav button:disabled:hover { border-color:var(--border); color:var(--text); }
+    .gazette { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px 32px; }
+    .gazette-headline { font-size:20px; font-weight:900; color:var(--text-bright); line-height:1.3; margin-bottom:6px; letter-spacing:-0.3px; }
+    .gazette-byline { font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:20px; font-weight:600; }
+    .gazette-body p { margin-bottom:14px; font-size:14px; line-height:1.75; color:var(--text); }
+    .gazette-body p:last-child { margin-bottom:0; }
+    .gazette-body strong { color:var(--text-bright); }
+    .gazette-body em { color:var(--amber); font-style:italic; }
+    .gazette-disclaimer { margin-top:16px; padding-top:12px; border-top:1px solid var(--border); font-size:10px; color:var(--text-dim); font-style:italic; text-align:center; }
+    @media(max-width:600px) { .gazette { padding:20px 16px; } .gazette-headline { font-size:17px; } }
+    .hl-nav .hl-label { color:var(--text-dim); font-size:13px; flex:1; text-align:center; }
+    .hl-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; font-size:13px; line-height:1.5; }
+    .hl-item + .hl-item { border-top:1px solid rgba(37,45,66,0.3); }
+    .hl-icon { font-size:16px; flex-shrink:0; width:24px; text-align:center; line-height:1.4; }
+    .hl-text { color:var(--text); }
+    .hl-text strong { color:var(--text-bright); }
+    .activity-bar { display:flex; align-items:center; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+    .activity-bar .summary { color:var(--text-dim); font-size:12px; }
+    .activity-bar .legend { display:flex; gap:12px; font-size:11px; color:var(--text-dim); }
+    .activity-bar .legend span { display:inline-flex; align-items:center; gap:4px; }
+    footer { padding:24px 0; text-align:center; color:var(--text-dim); font-size:11px; border-top:1px solid var(--border); opacity:.5; }
+    .hidden { display:none; }
+    @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+    .skel-row { display:flex; gap:12px; align-items:center; padding:12px 8px; border-bottom:1px solid rgba(37,45,66,0.5); }
+    .skel-bar { height:14px; border-radius:4px; background:linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%); background-size:400px 100%; animation:shimmer 1.5s infinite linear; }
+    .skel-circle { width:28px; height:28px; border-radius:50%; flex-shrink:0; background:linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%); background-size:400px 100%; animation:shimmer 1.5s infinite linear; }
+    .skel-head { height:18px; border-radius:4px; margin-bottom:20px; background:linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%); background-size:400px 100%; animation:shimmer 1.5s infinite linear; }
+    @media(max-width:600px) {
+      .wrap { padding:0 12px; }
+      .grid { grid-template-columns:1fr; }
+      .card.full { grid-column:1; }
+      .hero { padding:32px 0 28px; }
+      .hero .turn-num { font-size:48px; }
+      .cd-unit { min-width:60px; padding:10px 12px; }
+      .cd-unit .val { font-size:26px; }
+      th:nth-child(6), td:nth-child(6),
+      th:nth-child(8), td:nth-child(8),
+      th:nth-child(9), td:nth-child(9),
+      th:nth-child(10), td:nth-child(10),
+      th:nth-child(11), td:nth-child(11) { display:none; }
+      .st-done { color:#22c55e!important; opacity:1!important; }
+      .st-online { color:#3b82f6!important; opacity:1!important; }
+      .st-seen { color:#a78bfa!important; opacity:1!important; }
+      .st-none { color:#5a6a82!important; opacity:0.3!important; }
+      .nav-links { display:none; }
+      .chart-container canvas { height:220px!important; }
+      .connect-box { padding:20px 12px; }
+      .connect-box .host { font-size:18px; }
+      table { font-size:12px; }
+      thead th, tbody td { padding:10px 4px; }
+      .rank-col { width:28px; font-size:14px; }
+      .status-col { width:22px; font-size:14px; }
+      .score-gold { font-size:14px!important; }
+      .score-silver, .score-bronze { font-size:13px!important; }
+      .activity-bar { gap:8px; }
+      .activity-bar .legend { gap:8px; font-size:10px; }
+      section { padding:28px 0; }
+      .card { padding:16px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="inner">
+      <div class="brand"><span>Freeciv</span> Longturn</div>
+      <div class="nav-links" id="nav-links"></div>
+      <div id="status-pill"></div>
+    </div>
+  </div>
+</nav>
+
+<div class="hero"><div class="wrap" id="hero-content"><div class="kicker">Loading...</div></div></div>
+
+<div class="wrap">
+  <div id="gazette-section"></div>
+  <div id="headlines-section"></div>
+  <div id="rankings-section"><section><div class="section-head"><h2>Rankings</h2><div class="line"></div></div><div class="skel-head" style="width:200px;"></div><div id="skel-rankings"></div></section></div>
+  <div id="history-section"><section><div class="section-head"><h2>History</h2><div class="line"></div></div><div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;height:320px;display:flex;align-items:center;justify-content:center;"><div class="skel-bar" style="width:60%;height:200px;border-radius:8px;"></div></div></section></div>
+  <div id="diplomacy-section"></div>
+
+  <section id="connect">
+    <div class="section-head"><h2>Connect</h2><div class="line"></div></div>
+    <div class="connect-box">
+      <div class="host" id="connect-host">freeciv.andrewmcgrath.info</div>
+      <div class="port">Port <span id="connect-port">5556</span></div>
+      <div class="badge">Freeciv <span id="connect-version">3.2.3</span> Required</div>
+    </div>
+    <div class="grid">
+      <div class="card"><h3>Mac Install</h3><ol><li>Install <a href="https://brew.sh">Homebrew</a> if needed</li><li>Run <code>brew install freeciv</code></li><li>Launch with <code>freeciv-gtk4</code></li></ol><p class="dim" style="margin-top:8px;">Verify: <code>freeciv-gtk4 --version</code> must show 3.2.3</p></div>
+      <div class="card"><h3>Windows Install</h3><ol><li><a href="https://sourceforge.net/projects/freeciv/files/Freeciv%203.2/3.2.3/Freeciv-3.2.3-msys2-setup.exe/download">Download installer</a> (~50MB)</li><li>Run installer (defaults are fine)</li><li>Launch <strong>Freeciv GTK4 Client</strong> from Start Menu</li></ol></div>
+      <div class="card full"><h3>Connecting</h3><p>Open Freeciv &rarr; <strong>Connect to Network Game</strong> &rarr; Server: <code id="connect-host2">freeciv.andrewmcgrath.info</code> &rarr; Port: <code>5556</code> &rarr; Enter your username and password.</p></div>
+    </div>
+  </section>
+
+  <section id="rules">
+    <div class="section-head"><h2>Game Rules</h2><div class="line"></div></div>
+    <div class="card full" style="padding:0;overflow:hidden;">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:flex-start;"><div style="font-size:24px;line-height:1;flex-shrink:0;margin-top:2px;">&#x265F;</div><div><strong style="color:var(--text-bright);font-size:14px;">Longturn Format</strong><p style="margin-top:4px;">Like chess by mail but with armies, cities, and diplomacy. Log in once a day, make your moves, click <strong>Turn Done</strong>.</p></div></div>
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:flex-start;"><div style="font-size:24px;line-height:1;flex-shrink:0;margin-top:2px;">&#x23F1;</div><div><strong style="color:var(--text-bright);font-size:14px;">23-Hour Turns</strong><p style="margin-top:4px;">Each turn has a <strong>23-hour deadline</strong>. Click Turn Done when you're finished &mdash; if all players do it, the next turn starts right away.</p></div></div>
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:flex-start;"><div style="font-size:24px;line-height:1;flex-shrink:0;margin-top:2px;">&#x1F6AB;</div><div><strong style="color:var(--text-bright);font-size:14px;">No Double-Moving</strong><p style="margin-top:4px;"><strong>10-hour unit wait time</strong> prevents sneaky back-to-back moves across turn boundaries.</p></div></div>
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:flex-start;"><div style="font-size:24px;line-height:1;flex-shrink:0;margin-top:2px;">&#x1F50C;</div><div><strong style="color:var(--text-bright);font-size:14px;">Disconnecting</strong><p style="margin-top:4px;"><strong>AI will not take over</strong> if you go offline. Your units hold position, your empire waits.</p></div></div>
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:flex-start;"><div style="font-size:24px;line-height:1;flex-shrink:0;margin-top:2px;">&#x1F4E7;</div><div><strong style="color:var(--text-bright);font-size:14px;">Email Notifications</strong><p style="margin-top:4px;">You'll get an email at the start of each new turn with rankings, game stats, and the next deadline.</p></div></div>
+      <div style="padding:20px 24px;display:flex;gap:16px;align-items:flex-start;"><div style="font-size:24px;line-height:1;flex-shrink:0;margin-top:2px;">&#x1F3DB;</div><div><strong style="color:var(--text-bright);font-size:14px;">Ruleset: civ2civ3</strong><p style="margin-top:4px;">Balanced evolution of Civ2 rules for multiplayer. Tech trading, caravans, wonders, espionage, nuclear weapons. <a href="/nations.html">580+ nations</a> available.</p></div></div>
+    </div>
+  </section>
+
+  <section id="technical">
+    <div class="section-head"><h2>Technical Info</h2><div class="line"></div></div>
+    <div class="grid">
+      <div class="card"><h3>Server Configuration</h3><div class="spec-row"><span class="spec-label">Version</span><span class="spec-value">Freeciv 3.2.3</span></div><div class="spec-row"><span class="spec-label">Ruleset</span><span class="spec-value">civ2civ3</span></div><div class="spec-row"><span class="spec-label">Host</span><span class="spec-value" id="spec-host"></span></div><div class="spec-row"><span class="spec-label">Protocol</span><span class="spec-value">TCP (raw)</span></div><div class="spec-row"><span class="spec-label">Auth</span><span class="spec-value">SQLite + MD5</span></div><div class="spec-row"><span class="spec-label">Map Size</span><span class="spec-value">FULLSIZE (10) &mdash; 10,000 tiles</span></div></div>
+      <div class="card"><h3>Turn Settings</h3><div class="spec-row"><span class="spec-label">Timeout</span><span class="spec-value">82800s (23h)</span></div><div class="spec-row"><span class="spec-label">Unit Wait Time</span><span class="spec-value">36000s (10h)</span></div><div class="spec-row"><span class="spec-label">Fixed Length</span><span class="spec-value">Disabled</span></div><div class="spec-row"><span class="spec-label">Auto Toggle</span><span class="spec-value">Disabled</span></div><div class="spec-row"><span class="spec-label">First Timeout</span><span class="spec-value">-1 (same as normal)</span></div><div class="spec-row"><span class="spec-label">Min Players</span><span class="spec-value">0 (auto-start)</span></div></div>
+      <div class="card"><h3>Infrastructure</h3><div class="spec-row"><span class="spec-label">Hosting</span><span class="spec-value">Fly.io (yyz)</span></div><div class="spec-row"><span class="spec-label">CPU</span><span class="spec-value">Shared 1x</span></div><div class="spec-row"><span class="spec-label">Memory</span><span class="spec-value">256 MB</span></div><div class="spec-row"><span class="spec-label">Storage</span><span class="spec-value">Persistent volume</span></div><div class="spec-row"><span class="spec-label">OS</span><span class="spec-value">Debian Bookworm</span></div><div class="spec-row"><span class="spec-label">Web Server</span><span class="spec-value">busybox httpd</span></div></div>
+      <div class="card"><h3>Automation</h3><div class="spec-row"><span class="spec-label">Auto-save</span><span class="spec-value">Every turn + game over</span></div><div class="spec-row"><span class="spec-label">Auto-take</span><span class="spec-value">On connect (via FIFO)</span></div><div class="spec-row"><span class="spec-label">Turn Emails</span><span class="spec-value">SES SMTP on turn change</span></div><div class="spec-row"><span class="spec-label">Status Page</span><span class="spec-value">Regen every 15min + on turn</span></div><div class="spec-row"><span class="spec-label">Save Format</span><span class="spec-value">.sav.gz (gzip)</span></div><div class="spec-row"><span class="spec-label">DB Backend</span><span class="spec-value">SQLite (fcdb)</span></div></div>
+      <div class="card full"><h3>How It Works</h3><p>The server runs inside a Docker container on Fly.io. A startup script manages background processes for FIFO commands, turn watching, status page generation (JSON API), and HTTP serving via busybox httpd on port 8080.</p><p style="margin-top:8px;"><strong>API:</strong> Game state available as JSON at <code>/status.json</code> (current) and <code>/history.json</code> (per-turn stats).</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Join &amp; Help</h2><div class="line"></div></div>
+    <div class="grid">
+      <div class="card" style="text-align:center;"><h3>Want to Play?</h3><p style="margin-bottom:12px;">New players are welcome! Fill out the form and we'll set up your account.</p><a id="join-link" href="#" target="_blank" style="display:inline-block;background:var(--accent);color:#fff;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:700;text-decoration:none;">Request to Join</a><p class="dim" style="margin-top:8px;">Each player picks a unique nation &mdash; <a href="/nations.html">browse all 580+ nations</a></p></div>
+      <div class="card" style="text-align:center;"><h3>Need Help?</h3><p style="margin-bottom:12px;">Having trouble connecting, installing, or need your password reset?</p><a href="mailto:andrewjohnmcgrath@gmail.com" style="font-size:16px;font-weight:700;">andrewjohnmcgrath@gmail.com</a></div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="wrap"><span id="footer-text">Loading...</span></div></footer>
+
+<script>
+(function() {
+  var palette = ['#e94560','#14b8a6','#eab308','#a78bfa','#3b82f6','#f97316','#22c55e','#ec4899','#06b6d4','#facc15'];
+  var chart = null;
+  var DATA = null;
+
+  // Generate skeleton rows
+  (function() {
+    var el = document.getElementById('skel-rankings');
+    if (!el) return;
+    var rows = '';
+    for (var i = 0; i < 15; i++) {
+      var w = 60 + Math.random() * 40;
+      rows += '<div class="skel-row">' +
+        '<div class="skel-bar" style="width:24px;height:20px;flex-shrink:0;"></div>' +
+        '<div class="skel-circle"></div>' +
+        '<div style="flex:1;"><div class="skel-bar" style="width:' + w + '%;margin-bottom:6px;"></div><div class="skel-bar" style="width:40%;height:10px;"></div></div>' +
+        '<div class="skel-bar" style="width:40px;flex-shrink:0;"></div>' +
+        '<div class="skel-bar" style="width:30px;flex-shrink:0;"></div>' +
+        '<div class="skel-bar" style="width:30px;flex-shrink:0;"></div>' +
+        '</div>';
+    }
+    el.innerHTML = rows;
+  })();
+
+  function timeAgo(epoch) {
+    if (!epoch) return 'Never';
+    var d = Math.floor(Date.now() / 1000) - epoch;
+    if (d < 60) return 'Just now';
+    if (d < 3600) return Math.floor(d / 60) + 'm ago';
+    if (d < 86400) return Math.floor(d / 3600) + 'h ago';
+    if (d < 604800) return Math.floor(d / 86400) + 'd ago';
+    return Math.floor(d / 604800) + 'w ago';
+  }
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function renderNav(d) {
+    var links = document.getElementById('nav-links');
+    links.innerHTML = d.game.turn > 0
+      ? '<a href="#gazette">Chronicle</a><a href="#rankings">Rankings</a><a href="#history">History</a><a href="#connect">Connect</a><a href="/changelog.html">Changelog</a>'
+      : '<a href="#connect">Connect</a><a href="#rules">Rules</a><a href="/changelog.html">Changelog</a>';
+    var on = d.game.server_status === 'Online';
+    document.getElementById('status-pill').innerHTML =
+      '<div class="status-pill ' + (on ? 'online' : 'offline') + '"><div class="dot"></div>' + d.game.server_status + '</div>';
+  }
+
+  function renderHero(d) {
+    var el = document.getElementById('hero-content');
+    if (d.game.turn === 0) {
+      el.innerHTML = '<div class="kicker" style="letter-spacing:6px;">Pre-Game</div>' +
+        '<div class="turn-num" style="font-size:42px;color:var(--accent);">Registration Open</div>' +
+        '<div class="year-badge">Game has not started yet</div>' +
+        '<div style="margin-top:28px;max-width:460px;margin-left:auto;margin-right:auto;">' +
+        '<p style="color:var(--text);font-size:15px;line-height:1.7;margin-bottom:24px;">Sign up now to reserve your spot and choose your nation.</p>' +
+        '<a href="' + esc(d.meta.join_form_url) + '" target="_blank" style="display:inline-block;background:var(--accent);color:#fff;padding:14px 40px;border-radius:8px;font-size:17px;font-weight:700;text-decoration:none;">Request to Join</a></div>';
+      return;
+    }
+    el.innerHTML = '<div class="kicker">Current Turn</div>' +
+      '<div class="turn-num">' + d.game.turn + '</div>' +
+      '<div class="year-badge">' + esc(d.game.year_display) + '</div>' +
+      '<div class="countdown-section"><div class="label">Next turn in</div><div class="countdown">' +
+      '<div class="cd-unit"><div class="val" id="cd-h">--</div><div class="lbl">Hours</div></div>' +
+      '<div class="cd-unit"><div class="val" id="cd-m">--</div><div class="lbl">Min</div></div>' +
+      '<div class="cd-unit"><div class="val" id="cd-s">--</div><div class="lbl">Sec</div></div></div></div>' +
+      '<div style="color:var(--text-dim);font-size:11px;margin-top:14px;">Last saved: <span id="hero-last-saved">' + timeAgo(d.game.save_mtime) + '</span></div>' +
+      '<div style="margin-top:20px;"><a href="' + esc(d.meta.join_form_url) + '" target="_blank" style="display:inline-block;background:var(--accent);color:#fff;padding:12px 32px;border-radius:8px;font-size:15px;font-weight:700;text-decoration:none;">Request to Join</a>' +
+      '<div style="color:var(--text-dim);font-size:12px;margin-top:8px;">New players welcome</div></div>';
+    startCountdown(d.game.deadline_epoch);
+  }
+
+  function startCountdown(epoch) {
+    function tick() {
+      var diff = Math.max(0, epoch * 1000 - Date.now());
+      var h = document.getElementById('cd-h'), m = document.getElementById('cd-m'), s = document.getElementById('cd-s');
+      if (h) h.textContent = String(Math.floor(diff / 3600000)).padStart(2, '0');
+      if (m) m.textContent = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+      if (s) s.textContent = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+    }
+    tick(); setInterval(tick, 1000);
+  }
+
+  function rankEmoji(r) { return r === 1 ? '\u{1F947}' : r === 2 ? '\u{1F948}' : r === 3 ? '\u{1F949}' : r; }
+  function scoreClass(r) { return r === 1 ? 'score-gold' : r === 2 ? 'score-silver' : r === 3 ? 'score-bronze' : ''; }
+
+  function statusHtml(p) {
+    if (p.phase_done) return '<span class="st-done" title="Turn Done">\u2714</span>';
+    if (p.is_connected) return '<span class="st-online" title="Online now">\u25CF</span>';
+    if (p.connected_this_turn) return '<span class="st-seen" title="Logged in this turn">\u25CF</span>';
+    return '<span class="st-none">\u25CB</span>';
+  }
+
+  function missedPct(p) {
+    if (!p.total_turns || p.total_turns === 0) return '--';
+    var pct = Math.round((p.missed_turns / p.total_turns) * 100);
+    return pct + '%';
+  }
+
+  function missedClass(p) {
+    if (!p.total_turns || p.total_turns === 0) return '';
+    var pct = (p.missed_turns / p.total_turns) * 100;
+    if (pct >= 50) return 'miss-high';
+    if (pct >= 25) return 'miss-med';
+    return 'miss-low';
+  }
+
+  function renderRankings(d) {
+    var sec = document.getElementById('rankings-section');
+    if (d.game.turn === 0) { sec.innerHTML = ''; return; }
+    var a = d.activity;
+    var rows = '';
+    d.players.forEach(function(p) {
+      var idleStr = (p.idle_turn_streak != null && p.idle_turn_streak > 0) ? String(p.idle_turn_streak) : '-';
+      rows += '<tr class="' + (p.rank === 1 ? 'rank-1' : '') + '">' +
+        '<td class="rank-col">' + rankEmoji(p.rank) + '</td>' +
+        '<td class="status-col">' + statusHtml(p) + '</td>' +
+        '<td><strong>' + esc(p.name) + '</strong>' + (p.is_alive ? '' : ' \u{1F480}') + '<div class="sub">' + esc(p.nation) + '</div></td>' +
+        '<td class="num ' + scoreClass(p.rank) + '">' + p.score + '</td>' +
+        '<td class="num">' + p.cities + '</td><td class="num">' + p.units + '</td>' +
+        '<td class="num gold">' + p.gold + '</td><td class="gov">' + esc(p.government) + '</td>' +
+        '<td class="num ' + missedClass(p) + '">' + missedPct(p) + '</td>' +
+        '<td class="num idle-col">' + idleStr + '</td>' +
+        '<td class="lastseen">' + timeAgo(p.last_seen_epoch) + '</td></tr>';
+    });
+    sec.innerHTML = '<section id="rankings"><div class="section-head"><h2>Rankings</h2><div class="line"></div></div>' +
+      '<div class="activity-bar"><div class="summary">' + a.done_count + ' done &middot; ' + a.online_count + ' online &middot; ' + a.logged_in_count + '/' + a.total_players + ' seen this turn</div>' +
+      '<div class="legend"><span><span class="st-done">\u2714</span> Done</span><span><span class="st-online">\u25CF</span> Online</span><span><span class="st-seen">\u25CF</span> Seen</span><span><span class="st-none">\u25CB</span> Away</span></div></div>' +
+      '<table><thead><tr><th>#</th><th></th><th>Player</th><th>Score</th><th>Cities</th><th>Units</th><th>Gold</th><th>Gov</th><th title="Missed turns %">Miss%</th><th title="Consecutive turns without logging in">No-login</th><th>Last Seen</th></tr></thead><tbody>' + rows + '</tbody></table></section>';
+  }
+
+  function renderHistory(d) {
+    var sec = document.getElementById('history-section');
+    if (d.game.turn === 0 || !d.history || !d.history.length) { sec.innerHTML = ''; return; }
+    sec.innerHTML = '<section id="history"><div class="section-head"><h2>History</h2><div class="line"></div></div>' +
+      '<div class="chart-tabs" id="chart-tabs"><div class="chart-tab active" data-key="score">Score</div><div class="chart-tab" data-key="cities">Cities</div><div class="chart-tab" data-key="units">Units</div><div class="chart-tab" data-key="gold">Gold</div></div>' +
+      '<div class="chart-container"><canvas id="mainChart"></canvas></div></section>';
+    document.querySelectorAll('.chart-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.chart-tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        renderChart(tab.getAttribute('data-key'));
+      });
+    });
+    renderChart('score');
+  }
+
+  function renderChart(key) {
+    var ctx = document.getElementById('mainChart');
+    if (!ctx || !DATA) return;
+    if (chart) chart.destroy();
+    var history = DATA.history, names = DATA.player_names;
+    var labels = history.map(function(h) { return h.year < 0 ? Math.abs(h.year) + ' BC' : h.year + ' AD'; });
+    var datasets = names.map(function(name, i) {
+      var c = palette[i % palette.length];
+      return { label: name, data: history.map(function(h) { return h.players[name] ? h.players[name][key] : null; }),
+        borderColor: c, backgroundColor: c + '18', borderWidth: 2.5,
+        pointRadius: history.length > 30 ? 0 : 4, pointBackgroundColor: c, pointBorderColor: 'transparent',
+        pointHoverRadius: 6, pointHoverBackgroundColor: c, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2,
+        tension: 0.35, spanGaps: true, fill: true };
+    });
+    chart = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: datasets }, options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { color: '#5a6a82', font: { size: 12, weight: '600' }, boxWidth: 14, padding: 16, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { backgroundColor: '#171d2b', titleColor: '#e4eaf2', bodyColor: '#b0bdd0', borderColor: '#252d42', borderWidth: 1, padding: 12, cornerRadius: 8, titleFont: { weight: '700' }, bodyFont: { size: 13 }, displayColors: true, boxPadding: 4 } },
+      scales: { x: { ticks: { color: '#3a4560', font: { size: 11 }, maxRotation: 45 }, grid: { color: 'rgba(37,45,66,0.4)', drawBorder: false } },
+        y: { beginAtZero: true, ticks: { color: '#3a4560', font: { size: 11 }, padding: 8 }, grid: { color: 'rgba(37,45,66,0.4)', drawBorder: false } } },
+      animation: { duration: 600, easing: 'easeOutQuart' } } });
+  }
+
+  function diplStatusClass(s) {
+    var l = s.toLowerCase();
+    if (l === 'war') return 'dipl-war';
+    if (l === 'peace') return 'dipl-peace';
+    if (l === 'alliance') return 'dipl-alliance';
+    if (l === 'ceasefire') return 'dipl-ceasefire';
+    if (l === 'armistice') return 'dipl-armistice';
+    return '';
+  }
+
+  function yearStr(y) { return y < 0 ? Math.abs(y) + ' BC' : y + ' AD'; }
+
+  function renderDiplomacy(d) {
+    var sec = document.getElementById('diplomacy-section');
+    if (d.game.turn === 0 || !d.diplomacy) { sec.innerHTML = ''; return; }
+    var dipl = d.diplomacy;
+    var current = dipl.current || [];
+
+    // Current relationships
+    var currentHtml = '';
+    // Separate real treaties from default-war (first contact)
+    var treaties = [];
+    var contacts = [];
+    current.forEach(function(r) {
+      if (r.status === 'War' && r.closest === 'War') {
+        contacts.push(r);
+      } else {
+        treaties.push(r);
+      }
+    });
+
+    if (treaties.length === 0 && contacts.length === 0) {
+      currentHtml = '<div style="color:var(--text-dim);font-size:13px;padding:16px;text-align:center;">No diplomatic contact yet.</div>';
+    } else {
+      // Show real treaties first
+      treaties.forEach(function(r) {
+        var extras = [];
+        if (r.embassy) extras.push('Embassy');
+        if (r.shared_vision) extras.push('Shared Vision');
+        if (r.closest && r.closest !== r.status) extras.push('Former ' + r.closest);
+        // Show "WAR" only when a treaty was broken
+        var displayStatus = r.status;
+        var statusClass = diplStatusClass(r.status);
+        var metaStr = extras.length ? extras.join(' &middot; ') : '';
+        if (r.first_contact_turn) metaStr = (metaStr ? metaStr + ' &middot; ' : '') + 'Since turn ' + r.first_contact_turn;
+
+        currentHtml += '<div class="dipl-rel">' +
+          '<span class="dipl-status ' + statusClass + '">' + esc(displayStatus) + '</span>' +
+          '<span class="dipl-players">' + esc(r.players[0]) + ' <span class="dipl-arrow">&harr;</span> ' + esc(r.players[1]) + '</span>' +
+          (metaStr ? '<span class="dipl-meta">' + metaStr + '</span>' : '') +
+          '</div>';
+      });
+
+      // Show first-contact pairs subtly
+      if (contacts.length > 0) {
+        var contactNames = contacts.map(function(r) {
+          return esc(r.players[0]) + ' &amp; ' + esc(r.players[1]);
+        });
+        currentHtml += '<div style="color:var(--text-dim);font-size:12px;padding:12px 0 4px;border-top:1px solid var(--border);margin-top:8px;">' +
+          '<span style="font-weight:600;text-transform:uppercase;letter-spacing:1px;font-size:10px;">Have met:</span> ' +
+          contactNames.join(' &middot; ') + '</div>';
+      }
+    }
+
+    sec.innerHTML = '<section id="diplomacy"><div class="section-head"><h2>Diplomacy</h2><div class="line"></div></div>' +
+      currentHtml + '</section>';
+  }
+
+  function generateHeadlines(history, diplomacy) {
+    if (!history || history.length < 2) return [];
+    var allHeadlines = [];
+
+    for (var t = 1; t < history.length; t++) {
+      var prev = history[t - 1];
+      var curr = history[t];
+      var items = [];
+
+      // Diplomacy events for this turn
+      if (diplomacy && diplomacy.events) {
+        diplomacy.events.forEach(function(e) {
+          if (e.turn !== curr.turn) return;
+          if (e.to === 'War' && e.from === 'Never met') items.push({icon: '\u{1F30D}', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> made first contact'});
+          else if (e.to === 'War') items.push({icon: '\u2694\uFE0F', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> are now at war!'});
+          else if (e.to === 'Peace') items.push({icon: '\u{1F54A}\uFE0F', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> signed a peace treaty'});
+          else if (e.to === 'Alliance') items.push({icon: '\u{1F91D}', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> formed an alliance'});
+          else if (e.to === 'Ceasefire') items.push({icon: '\u{1F3F3}\uFE0F', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> agreed to a ceasefire'});
+        });
+      }
+
+      // Per-player diffs
+      var names = Object.keys(curr.players);
+      names.forEach(function(name) {
+        var c = curr.players[name];
+        var p = prev.players[name];
+        if (!p) {
+          items.push({icon: '\u{1F31F}', text: '<strong>' + esc(name) + '</strong> joined the game as ' + esc(c.nation)});
+          return;
+        }
+
+        // New cities
+        var newCities = c.cities - p.cities;
+        if (newCities > 0) items.push({icon: '\u{1F3D7}\uFE0F', text: '<strong>' + esc(name) + '</strong> founded ' + newCities + ' new cit' + (newCities === 1 ? 'y' : 'ies')});
+        if (newCities < 0) items.push({icon: '\u{1F4A5}', text: '<strong>' + esc(name) + '</strong> lost ' + Math.abs(newCities) + ' cit' + (Math.abs(newCities) === 1 ? 'y' : 'ies')});
+
+        // Tech discoveries
+        if (c.techs != null && p.techs != null && c.techs > p.techs) {
+          var newTechs = c.techs - p.techs;
+          items.push({icon: '\u{1F4A1}', text: '<strong>' + esc(name) + '</strong> discovered ' + newTechs + ' new technolog' + (newTechs === 1 ? 'y' : 'ies')});
+        }
+
+        // Government change
+        if (c.government !== p.government) {
+          items.push({icon: '\u{1F3DB}\uFE0F', text: '<strong>' + esc(name) + '</strong> switched to ' + esc(c.government)});
+        }
+
+        // Unit changes by category (hide specific types to not reveal strategy)
+        var workerTypes = {'Settlers':1,'Workers':1,'Engineers':1};
+        var civilianTypes = {'Explorer':1,'Diplomat':1,'Spy':1,'Caravan':1,'Freight':1,'Leader':1};
+        if (c.unit_types && p.unit_types) {
+          var allTypes = {};
+          Object.keys(c.unit_types).forEach(function(t) { allTypes[t] = true; });
+          Object.keys(p.unit_types).forEach(function(t) { allTypes[t] = true; });
+          var cats = {military:[0,0], worker:[0,0], civilian:[0,0]};
+          Object.keys(allTypes).forEach(function(t) {
+            var diff = (c.unit_types[t] || 0) - (p.unit_types[t] || 0);
+            var cat = workerTypes[t] ? 'worker' : civilianTypes[t] ? 'civilian' : 'military';
+            if (diff > 0) cats[cat][0] += diff;
+            if (diff < 0) cats[cat][1] += Math.abs(diff);
+          });
+          if (cats.military[0]) items.push({icon: '\u{1F6E1}\uFE0F', text: '<strong>' + esc(name) + '</strong> trained ' + cats.military[0] + ' military unit' + (cats.military[0]===1?'':'s')});
+          if (cats.worker[0]) items.push({icon: '\u{1F528}', text: '<strong>' + esc(name) + '</strong> trained ' + cats.worker[0] + ' worker' + (cats.worker[0]===1?'':'s')});
+          if (cats.civilian[0]) items.push({icon: '\u{1F465}', text: '<strong>' + esc(name) + '</strong> trained ' + cats.civilian[0] + ' civilian unit' + (cats.civilian[0]===1?'':'s')});
+          if (cats.military[1]) items.push({icon: '\u2620\uFE0F', text: '<strong>' + esc(name) + '</strong> lost ' + cats.military[1] + ' military unit' + (cats.military[1]===1?'':'s')});
+          if (cats.worker[1]) items.push({icon: '\u{1F4A5}', text: '<strong>' + esc(name) + '</strong> lost ' + cats.worker[1] + ' worker' + (cats.worker[1]===1?'':'s')});
+          if (cats.civilian[1]) items.push({icon: '\u{1F4A5}', text: '<strong>' + esc(name) + '</strong> lost ' + cats.civilian[1] + ' civilian unit' + (cats.civilian[1]===1?'':'s')});
+        }
+
+        // Score milestones (multiples of 100)
+        var prevHundred = Math.floor(p.score / 100);
+        var currHundred = Math.floor(c.score / 100);
+        if (currHundred > prevHundred && c.score >= 100) {
+          items.push({icon: '\u{1F4C8}', text: '<strong>' + esc(name) + '</strong> reached a score of ' + (currHundred * 100)});
+        }
+
+        // Death
+        if (c.is_alive === false && p.is_alive !== false) {
+          items.push({icon: '\u{1F480}', text: '<strong>' + esc(name) + '</strong> has been eliminated!'});
+        }
+      });
+
+      if (items.length > 0) {
+        allHeadlines.push({
+          turn: curr.turn,
+          year: curr.year,
+          items: items
+        });
+      }
+    }
+    return allHeadlines;
+  }
+
+  var headlinesTurn = -1;
+
+  function renderHeadlines(d) {
+    var sec = document.getElementById('headlines-section');
+    if (d.game.turn === 0 || !d.history || d.history.length < 2) { sec.innerHTML = ''; return; }
+
+    var headlines = generateHeadlines(d.history, d.diplomacy);
+    if (!headlines.length) { sec.innerHTML = ''; return; }
+
+    // Default to latest (previous completed turn)
+    if (headlinesTurn < 0) headlinesTurn = headlines.length - 1;
+    headlinesTurn = Math.max(0, Math.min(headlinesTurn, headlines.length - 1));
+
+    var h = headlines[headlinesTurn];
+    var yearLabel = h.year < 0 ? Math.abs(h.year) + ' BC' : h.year + ' AD';
+
+    var itemsHtml = '';
+    h.items.forEach(function(item) {
+      itemsHtml += '<div class="hl-item"><span class="hl-icon">' + item.icon + '</span><span class="hl-text">' + item.text + '</span></div>';
+    });
+
+    sec.innerHTML = '<section id="headlines"><div class="section-head"><h2>Headlines</h2><div class="line"></div></div>' +
+      '<div class="hl-nav">' +
+      '<button id="hl-prev" ' + (headlinesTurn <= 0 ? 'disabled' : '') + '>&larr;</button>' +
+      '<span class="hl-label">Turn ' + h.turn + ' &middot; ' + yearLabel + '</span>' +
+      '<button id="hl-next" ' + (headlinesTurn >= headlines.length - 1 ? 'disabled' : '') + '>&rarr;</button>' +
+      '</div>' +
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">' + itemsHtml + '</div>' +
+      '</section>';
+
+    document.getElementById('hl-prev').addEventListener('click', function() {
+      if (headlinesTurn > 0) { headlinesTurn--; renderHeadlines(d); }
+    });
+    document.getElementById('hl-next').addEventListener('click', function() {
+      if (headlinesTurn < headlines.length - 1) { headlinesTurn++; renderHeadlines(d); }
+    });
+  }
+
+  var gazetteTurn = -1;
+
+  function renderGazette(d) {
+    var sec = document.getElementById('gazette-section');
+    if (d.game.turn === 0 || !d.gazette || !d.gazette.length) { sec.innerHTML = ''; return; }
+
+    var entries = d.gazette;
+    if (gazetteTurn < 0) gazetteTurn = entries.length - 1;
+    gazetteTurn = Math.max(0, Math.min(gazetteTurn, entries.length - 1));
+
+    var g = entries[gazetteTurn];
+
+    sec.innerHTML = '<section id="gazette"><div class="section-head"><h2>The Civ Chronicle</h2><div class="line"></div></div>' +
+      '<div class="hl-nav">' +
+      '<button id="gz-prev" ' + (gazetteTurn <= 0 ? 'disabled' : '') + '>&larr;</button>' +
+      '<span class="hl-label">Turn ' + g.turn + ' &middot; ' + esc(g.year_display) + '</span>' +
+      '<button id="gz-next" ' + (gazetteTurn >= entries.length - 1 ? 'disabled' : '') + '>&rarr;</button>' +
+      '</div>' +
+      '<div class="gazette">' +
+      '<div class="gazette-headline">' + esc(g.headline) + '</div>' +
+      '<div class="gazette-byline">The Civ Chronicle &middot; Turn ' + g.turn + ' &middot; ' + esc(g.year_display) + '</div>' +
+      '<div class="gazette-body">' + g.article + '</div>' +
+      '</div></section>';
+
+    document.getElementById('gz-prev').addEventListener('click', function() {
+      if (gazetteTurn > 0) { gazetteTurn--; renderGazette(d); }
+    });
+    document.getElementById('gz-next').addEventListener('click', function() {
+      if (gazetteTurn < entries.length - 1) { gazetteTurn++; renderGazette(d); }
+    });
+  }
+
+  function renderFooter(d) {
+    document.getElementById('footer-text').innerHTML =
+      'Last updated: ' + esc(d.meta.generated_at) + ' &middot; Last saved: <span id="last-saved">' + timeAgo(d.game.save_mtime) + '</span> &middot; Auto-refreshes every 5 minutes';
+  }
+
+  function renderConfig(d) {
+    var h = d.meta.server_host;
+    document.getElementById('spec-host').textContent = h + ':' + d.meta.server_port;
+    document.getElementById('connect-host').textContent = h;
+    document.getElementById('connect-host2').textContent = h;
+    document.getElementById('connect-port').textContent = d.meta.server_port;
+    document.getElementById('connect-version').textContent = d.meta.game_version;
+    document.getElementById('join-link').href = d.meta.join_form_url;
+    document.title = 'Freeciv Longturn \u2014 ' + h;
+  }
+
+  function render(d) {
+    DATA = d;
+    renderNav(d); renderHero(d); renderGazette(d); renderRankings(d); renderHistory(d); renderFooter(d); renderConfig(d);
+  }
+
+  function load() {
+    Promise.all([
+      fetch('/status.json?_=' + Date.now()).then(function(r) { return r.json(); }),
+      fetch('/history.json?_=' + Date.now()).then(function(r) { return r.json(); }).catch(function() { return []; }),
+      fetch('/diplomacy.json?_=' + Date.now()).then(function(r) { return r.json(); }).catch(function() { return {current:[],events:[]}; }),
+      fetch('/gazette.json?_=' + Date.now()).then(function(r) { return r.json(); }).catch(function() { return []; })
+    ]).then(function(results) {
+      var d = results[0];
+      d.history = results[1];
+      d.diplomacy = results[2];
+      d.gazette = results[3];
+      var nameSet = {};
+      d.history.forEach(function(entry) {
+        Object.keys(entry.players).forEach(function(n) { nameSet[n] = true; });
+      });
+      d.player_names = Object.keys(nameSet).sort();
+      render(d);
+    }).catch(function(e) { console.error('Failed to load data:', e); });
+  }
+
+  load();
+  setInterval(load, 300000);
+  setInterval(function() {
+    if (!DATA) return;
+    ['last-saved', 'hero-last-saved'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = timeAgo(DATA.game.save_mtime);
+    });
+  }, 30000);
+})();
+</script>
+</body>
+</html>

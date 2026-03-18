@@ -1,0 +1,5 @@
+PLAYERS=(
+  # Format: "username:password:email:nation"
+  # "player1:secretpass:player1@example.com:Canadian"
+  # "player2:secretpass:player2@example.com:Roman"
+)

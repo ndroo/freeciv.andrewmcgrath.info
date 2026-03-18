@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Changelog — Freeciv Longturn</title>
+  <style>
+    :root {
+      --bg: #0a0d14; --surface: #111621; --surface-2: #171d2b;
+      --border: #252d42; --text: #b0bdd0; --text-dim: #5a6a82; --text-bright: #e4eaf2;
+      --accent: #e94560; --green: #22c55e; --amber: #eab308; --blue: #3b82f6; --teal: #14b8a6;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:var(--bg); color:var(--text); font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; line-height:1.6; -webkit-font-smoothing:antialiased; }
+    .wrap { max-width:720px; margin:0 auto; padding:0 20px; }
+    a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+    nav { background:var(--surface); border-bottom:1px solid var(--border); padding:10px 0; position:sticky; top:0; z-index:50; }
+    nav .inner { display:flex; align-items:center; justify-content:space-between; }
+    .brand { font-weight:800; font-size:15px; color:var(--text-bright); letter-spacing:-0.5px; }
+    .brand span { color:var(--accent); }
+    .nav-links { display:flex; gap:20px; font-size:12px; }
+    .nav-links a { color:var(--text-dim); text-decoration:none; text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+    .nav-links a:hover { color:var(--text-bright); }
+    h1 { font-size:28px; font-weight:900; color:var(--text-bright); margin:48px 0 8px; letter-spacing:-0.5px; }
+    .subtitle { color:var(--text-dim); font-size:14px; margin-bottom:40px; }
+    .entry { margin-bottom:40px; padding-bottom:40px; border-bottom:1px solid var(--border); }
+    .entry:last-child { border-bottom:none; }
+    .entry-date { font-size:12px; text-transform:uppercase; letter-spacing:2px; color:var(--accent); font-weight:700; margin-bottom:6px; }
+    .entry-title { font-size:18px; font-weight:700; color:var(--text-bright); margin-bottom:14px; }
+    .entry ul { padding-left:20px; }
+    .entry li { margin-bottom:8px; font-size:14px; line-height:1.7; }
+    .entry li strong { color:var(--text-bright); }
+    .tag { display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; padding:2px 8px; border-radius:4px; margin-right:6px; }
+    .tag-fix { background:rgba(233,69,96,0.15); color:var(--accent); }
+    .tag-new { background:rgba(34,197,94,0.15); color:var(--green); }
+    .tag-improve { background:rgba(59,130,246,0.15); color:var(--blue); }
+    code { background:var(--surface-2); padding:2px 6px; border-radius:4px; font-size:12px; color:var(--teal); }
+    footer { padding:24px 0; text-align:center; color:var(--text-dim); font-size:11px; border-top:1px solid var(--border); opacity:.5; margin-top:40px; }
+    @media(max-width:600px) {
+      .wrap { padding:0 12px; }
+      h1 { font-size:22px; margin-top:32px; }
+      .entry-title { font-size:16px; }
+      .nav-links { display:none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="inner">
+      <div class="brand"><span>Freeciv</span> Longturn</div>
+      <div class="nav-links">
+        <a href="/">Status</a>
+        <a href="/nations.html">Nations</a>
+        <a href="/changelog.html">Changelog</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <h1>Changelog</h1>
+  <p class="subtitle">Server updates, fixes, and new features.</p>
+
+  <div class="entry">
+    <div class="entry-date">March 17, 2026</div>
+    <div class="entry-title">Attendance tracking</div>
+    <ul>
+      <li><span class="tag tag-new">New</span> <strong>Missed turns percentage</strong> — the rankings table now shows what % of completed turns each player missed (didn't click Turn Done). Color-coded: green &lt;25%, amber 25-49%, red 50%+.</li>
+      <li><span class="tag tag-new">New</span> <strong>Idle turn streak</strong> — shows how many consecutive turns a player has been idle, right in the rankings table.</li>
+      <li><span class="tag tag-new">New</span> <strong>Attendance API</strong> — <code>/attendance.json</code> tracks per-player missed turn counts and which specific turns were missed. Rebuilt automatically from save files.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">March 15, 2026</div>
+    <div class="entry-title">Turn emails now read from the same data as the status page</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>Email rankings match the status page</strong> — turn notification emails now read from <code>status.json</code> instead of parsing save files independently. Rankings, scores, and stats in emails are guaranteed to match what you see on the website.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Status page updates before emails send</strong> — on turn change, the status page is regenerated first, then emails go out. Previously they raced each other.</li>
+      <li><span class="tag tag-new">New</span> <strong>Test mode for emails</strong> — admins can send a test email to a single address with <code>--to=email@example.com</code>.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">March 14, 2026</div>
+    <div class="entry-title">Reliable status page, faster generation, and health monitoring</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>Status page stopped updating silently</strong> — a signal handling bug was killing the background generator process. No way to detect or recover until someone noticed the page was stale.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Switched to cron scheduling</strong> — status page now regenerates every 5 minutes via cron instead of a fragile background loop. If a run fails, the next one picks it up automatically.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Split status and history data</strong> — per-turn player stats (score, cities, units, gold) are now in a separate <code>history.json</code> file that only appends new turns. The generator now parses just the latest save file instead of every save from turn 1, keeping it fast as the game goes on.</li>
+      <li><span class="tag tag-new">New</span> <strong>Health endpoint</strong> — <code>/cgi-bin/health</code> returns whether both data files are fresh, with details on which file is the problem if something goes wrong. Ready for uptime monitoring.</li>
+      <li><span class="tag tag-fix">Fix</span> <strong>Concurrent run race condition</strong> — added file locking so cron and turn-change triggers don't step on each other. Also fixed a bug where temp file cleanup could wipe files from other running instances.</li>
+      <li><span class="tag tag-new">New</span> <strong>Recovery tools</strong> — <code>--rebuild-history</code> flag re-parses all save files to reconstruct history from scratch. Corrupted history files are automatically detected and recovered.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">March 13, 2026</div>
+    <div class="entry-title">UncleS joins the game</div>
+    <ul>
+      <li><span class="tag tag-new">New</span> <strong>16th player added mid-game</strong> — UncleS (British) joined via save file editing with starting units placed on the map.</li>
+      <li><span class="tag tag-new">New</span> <strong>Mid-game player add command</strong> — <code>manage_players.sh add</code> handles DB auth, save file editing, and welcome email in one step.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">March 13, 2026</div>
+    <div class="entry-title">JSON-first status page</div>
+    <ul>
+      <li><span class="tag tag-improve">Improve</span> <strong>Rebuilt around a JSON API</strong> — the status page is now a static HTML file that fetches <code>/status.json</code> and renders everything client-side. Makes it easy to build tools on top of the game data.</li>
+      <li><span class="tag tag-fix">Fix</span> <strong>Stale "Turn Done" data</strong> — fixed a bash 5 bug where associative arrays weren't being cleared between runs, causing old phase_done values to leak through.</li>
+      <li><span class="tag tag-new">New</span> <strong>Test suite</strong> — 67 assertions covering every JSON field, idempotency, stale state regression, corruption recovery, and more. Uses real production save files as test fixtures.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">March 11, 2026</div>
+    <div class="entry-title">Reboot-resilient turn timer</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>Turn timer survives reboots</strong> — on resume, the server reads elapsed time from the save file and sets the timeout to the remaining time. No more lost hours after deploys.</li>
+      <li><span class="tag tag-new">New</span> <strong>Manual timer override</strong> — <code>fix_turn_timer.sh</code> lets the admin set a custom turn end time (e.g. extend to 4am for a slow day).</li>
+      <li><span class="tag tag-new">New</span> <strong>Email toggle</strong> — flip <code>email_enabled.settings</code> to disable all emails without redeploying.</li>
+      <li><span class="tag tag-new">New</span> <strong>Gold editor</strong> — <code>change_gold.sh</code> adjusts player gold via lua command.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">March 11, 2026</div>
+    <div class="entry-title">Turn reminder and email fixes</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>Turn deadline calculation</strong> — was using save file mtime which got overwritten by the auto-saver every 5 minutes. Now tracks the actual turn start time in a dedicated file.</li>
+      <li><span class="tag tag-fix">Fix</span> <strong>"Connected this turn" tracking</strong> — was counting all connections in the log instead of just connections since the current turn started.</li>
+      <li><span class="tag tag-fix">Fix</span> <strong>"Last saved" display</strong> — now shows actual save file time instead of turn start time.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">March 10, 2026</div>
+    <div class="entry-title">Initial release</div>
+    <ul>
+      <li><span class="tag tag-new">New</span> <strong>Freeciv 3.2.3 longturn server</strong> — 23-hour turns, 10-hour unit wait time, running on Fly.io.</li>
+      <li><span class="tag tag-new">New</span> <strong>Live status page</strong> — rankings, countdown timer, phase_done indicators, history charts, mobile-responsive design.</li>
+      <li><span class="tag tag-new">New</span> <strong>Email notifications</strong> — turn change emails via SES with rankings and deadline info. Reminder emails 2 hours before deadline.</li>
+      <li><span class="tag tag-new">New</span> <strong>Auto-save and shutdown protection</strong> — saves every 5 minutes, plus SIGTERM-triggered save on deploy so no progress is lost.</li>
+      <li><span class="tag tag-new">New</span> 15 players configured across unique nations.</li>
+    </ul>
+  </div>
+</div>
+
+<footer><div class="wrap">Freeciv Longturn &mdash; freeciv.andrewmcgrath.info</div></footer>
+
+</body>
+</html>

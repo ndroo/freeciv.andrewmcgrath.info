@@ -1,0 +1,44 @@
+#!/bin/sh
+# Healthcheck endpoint — returns 200 if status.json and history.json are fresh
+
+STATUS_FILE="/opt/freeciv/www/status.json"
+HISTORY_FILE="/opt/freeciv/www/history.json"
+MAX_AGE=420  # 7 minutes in seconds
+
+NOW_EPOCH=$(date +%s)
+ERRORS=""
+STATUS_AGE=""
+HISTORY_AGE=""
+
+# Check status.json
+if [ ! -f "$STATUS_FILE" ]; then
+  ERRORS="${ERRORS}status.json not found; "
+else
+  STATUS_AGE=$((NOW_EPOCH - $(stat -c %Y "$STATUS_FILE" 2>/dev/null || echo "$NOW_EPOCH")))
+  if [ "$STATUS_AGE" -gt "$MAX_AGE" ]; then
+    ERRORS="${ERRORS}status.json is ${STATUS_AGE}s old (max ${MAX_AGE}s); "
+  fi
+fi
+
+# Check history.json
+if [ ! -f "$HISTORY_FILE" ]; then
+  ERRORS="${ERRORS}history.json not found; "
+else
+  HISTORY_AGE=$((NOW_EPOCH - $(stat -c %Y "$HISTORY_FILE" 2>/dev/null || echo "$NOW_EPOCH")))
+  if [ "$HISTORY_AGE" -gt "$MAX_AGE" ]; then
+    ERRORS="${ERRORS}history.json is ${HISTORY_AGE}s old (max ${MAX_AGE}s); "
+  fi
+fi
+
+if [ -n "$ERRORS" ]; then
+  echo "Status: 503 Service Unavailable"
+  echo "Content-Type: application/json"
+  echo ""
+  echo "{\"healthy\":false,\"errors\":\"${ERRORS%%; }\",\"status_age\":${STATUS_AGE:-null},\"history_age\":${HISTORY_AGE:-null}}"
+  exit 0
+fi
+
+echo "Status: 200 OK"
+echo "Content-Type: application/json"
+echo ""
+echo "{\"healthy\":true,\"status_age\":${STATUS_AGE},\"history_age\":${HISTORY_AGE}}"

@@ -1,0 +1,78 @@
+# Longturn game settings
+# 23-hour turns (82800 seconds)
+set timeout 82800
+
+# Prevent double-moves across turn boundaries (10 hours)
+set unitwaittime 36000
+
+# Turn ends early when ALL players click Turn Done, otherwise waits for timeout
+set fixedlength disabled
+
+# Don't let AI take over when a human disconnects
+# This prevents offline players from auto-finishing turns
+set autotoggle disabled
+
+# First turn uses the same 23-hour timeout as all other turns
+set first_timeout -1
+
+# Auto-save on each turn change and game over
+set autosaves TURN|GAMEOVER
+
+# Save file naming pattern (%T = turn number)
+set savename "lt-game-%T"
+
+# Standard map size for longturn (adjust as needed)
+set mapsize FULLSIZE
+set size 10
+
+# Allow taking AI players, observers allowed
+set allowtake HAhadOo
+
+# Reasonable defaults
+set minplayers 2
+set maxplayers 30
+set aifill 0
+
+# Victory: allied only (no spacerace)
+set victories ALLIED
+
+# Make all nations available
+set nationset all
+
+# Players
+create shazow
+playernation shazow Canadian 1
+create hyfen
+playernation hyfen Dutch 1
+create blakkout
+playernation blakkout Viking 1
+create jess
+playernation jess Polynesian 1
+create andrew
+playernation andrew Australian 1
+create jamsem24
+playernation jamsem24 German 1
+create minikeg
+playernation minikeg Antarctican 1
+create tracymakes
+playernation tracymakes Californian 1
+create ihop
+playernation ihop Japanese 1
+create shogun
+playernation shogun English 1
+create kimjongboom
+playernation kimjongboom "North Korean" 1
+# Note: if "North Korean" fails, try: playernation kimjongboom northkorean 1
+create kroony
+playernation kroony Atlantean 1
+create tankerjon
+playernation tankerjon Roman 1
+create peter
+playernation peter Florentine 1
+create DetectiveG
+playernation DetectiveG Maltese 1
+create UncleS
+playernation UncleS British 1
+
+set minplayers 0
+start

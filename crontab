@@ -1,0 +1,2 @@
+# Status page regeneration — runs every 5 minutes
+*/5 * * * * /opt/freeciv/generate_status_json.sh >> /data/saves/status-generator.log 2>&1
