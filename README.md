@@ -2,6 +2,8 @@
 
 A self-hosted Freeciv 3.2.3 multiplayer server designed for longturn games (23-hour turns), running on Fly.io with email notifications, a live status page, and an AI-generated newspaper.
 
+**Live demo**: [freeciv.andrewmcgrath.info](https://freeciv.andrewmcgrath.info) — an active 16-player game running on this codebase.
+
 ## What is Longturn?
 
 Longturn is a style of Freeciv multiplayer where each turn lasts ~23 hours instead of minutes. Players log in once a day, make their moves, click "Turn Done", and go about their lives. When all players have ended their turn (or the timer runs out), the next turn begins.
