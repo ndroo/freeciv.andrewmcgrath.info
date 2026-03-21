@@ -155,7 +155,7 @@ EOF_SLACKERS
       if [ -n "$TEST_TO" ]; then
         SLACKER_EMAIL="$TEST_TO"
       else
-        SLACKER_EMAIL=$(sqlite3 "$DB_PATH" "SELECT email FROM fcdb_auth WHERE name='$SLACKER_NAME' AND email IS NOT NULL AND email != '';" 2>/dev/null)
+        SLACKER_EMAIL=$(sqlite3 "$DB_PATH" "SELECT email FROM fcdb_auth WHERE LOWER(name)=LOWER('$SLACKER_NAME') AND email IS NOT NULL AND email != '';" 2>/dev/null)
         [ -z "$SLACKER_EMAIL" ] && continue
       fi
 
