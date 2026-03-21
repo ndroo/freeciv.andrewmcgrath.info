@@ -64,6 +64,24 @@
   <p class="subtitle">Server updates, fixes, and new features.</p>
 
   <div class="entry">
+    <div class="entry-date">March 21, 2026</div>
+    <div class="entry-title">Disk space fix & archived save cleanup</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>Disk full broke status page</strong> — archived saves from the auto-saver filled the 1GB volume (4,896 files). Status page, gazette generation, and game saves all failed silently. Cleared old archives and restored everything.</li>
+      <li><span class="tag tag-new">New</span> <strong>Automatic archive cleanup</strong> — on each turn change, archived saves from previous turns are pruned down to just the most recent one per turn. Prevents disk from filling up again.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">March 19, 2026</div>
+    <div class="entry-title">Diplomacy: Contact vs War</div>
+    <ul>
+      <li><span class="tag tag-improve">Improve</span> <strong>Contact vs War</strong> — diplomacy now distinguishes between "Contact" (just met, no hostilities) and "War" (actual combat detected). War status is only shown when units have fought.</li>
+      <li><span class="tag tag-fix">Fix</span> <strong>Status generation speed</strong> — diplomacy data is now rebuilt incrementally instead of from scratch every 5 minutes. Fixes status page going stale when the full rebuild took too long.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
     <div class="entry-date">March 18, 2026</div>
     <div class="entry-title">Open source & reliability fixes</div>
     <ul>

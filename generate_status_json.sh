@@ -427,10 +427,16 @@ extract_diplomacy() {
           local sv_json="false"
           [ "$shared_vision" = "TRUE" ] && sv_json="true"
 
+          # Default War state (closest=War) just means "met", not actual combat
+          local display_status="$status"
+          if [ "$status" = "War" ] && [ "$closest" = "War" ]; then
+            display_status="Contact"
+          fi
+
           relationships=$(echo "$relationships" | jq \
             --arg p1 "${pnames[$i]}" \
             --arg p2 "${pnames[$row]}" \
-            --arg status "$status" \
+            --arg status "$display_status" \
             --arg closest "$closest" \
             --argjson first_contact "${first_contact:-0}" \
             --argjson has_reason_to_cancel "$hrc_json" \
@@ -458,10 +464,67 @@ extract_diplomacy() {
     '{turn: $turn, year: $year, relationships: $relationships}'
 }
 
+# ---------------------------------------------------------------------------
+# Extract combat pairs from a save file's event_cache.
+# Returns JSON array of ["name1","name2"] pairs (sorted alphabetically).
+# Uses sed/grep/awk for speed — no jq in loops.
+# ---------------------------------------------------------------------------
+extract_combat_pairs() {
+  local tmpfile="$1"
+  local np
+  np=$(grep -c '^\[player[0-9]' "$tmpfile" 2>/dev/null || echo 0)
+
+  # Build semicolon-separated "idx:name" lookup for awk
+  local name_lines=""
+  for i in $(seq 0 $((np - 1))); do
+    local n
+    n=$(sed -n "/^\[player${i}\]/,/^\[/p" "$tmpfile" | head -20 | grep '^name=' | head -1 | sed 's/name="//' | sed 's/"//')
+    [ -n "$name_lines" ] && name_lines="${name_lines};"
+    name_lines="${name_lines}${i}:${n}"
+  done
+
+  # Pipeline: extract combat events → pair by timestamp → map indices to names
+  local pairs
+  pairs=$(sed -n '/^\[event_cache\]/,/^\[/p' "$tmpfile" | \
+    grep -E '"E_UNIT_(WIN|LOST)_(ATT|DEF)"' | \
+    awk -F',' '{
+      ts=$3; gsub(/"/, "", $8)
+      for (i=1; i<=length($8); i++)
+        if (substr($8,i,1)=="1") { print ts, i-1; break }
+    }' | \
+    awk -v names="$name_lines" '
+    BEGIN {
+      n=split(names, arr, ";")
+      for (k=1; k<=n; k++) {
+        split(arr[k], kv, ":")
+        if (kv[1] != "") namemap[kv[1]] = kv[2]
+      }
+    }
+    {
+      if ($1==prev_ts && $2!=prev_p) {
+        a=($2<prev_p)?$2:prev_p; b=($2<prev_p)?prev_p:$2
+        n1=namemap[a]; n2=namemap[b]
+        if (n1!="" && n2!="") {
+          if (n1>n2) { tmp=n1; n1=n2; n2=tmp }
+          pairs[n1 "|" n2]=1
+        }
+      }
+      prev_ts=$1; prev_p=$2
+    }
+    END { for (p in pairs) print p }' | sort -u)
+
+  if [ -z "$pairs" ]; then
+    echo "[]"
+  else
+    echo "$pairs" | jq -R 'split("|")' | jq -s '.'
+  fi
+}
+
 # Build diplomacy history from all saves
 build_diplomacy() {
   local history="[]"
   local prev_states="{}"
+  local all_combat="[]"
 
   while read -r turn_num save_path; do
     [ -z "$save_path" ] && continue
@@ -470,6 +533,12 @@ build_diplomacy() {
     tmp=$(decompress_save "$save_path") || continue
     local entry
     entry=$(extract_diplomacy "$tmp")
+    # Extract combat pairs before removing tmp
+    local turn_combat
+    turn_combat=$(extract_combat_pairs "$tmp")
+    if [ "$(echo "$turn_combat" | jq 'length')" -gt 0 ]; then
+      all_combat=$(echo "$all_combat" | jq --argjson p "$turn_combat" '. + $p | unique')
+    fi
     rm -f "$tmp"
 
     local turn_year turn_rels
@@ -538,6 +607,12 @@ build_diplomacy() {
     dtmp=$(decompress_save "$latest_tmp") || true
     if [ -n "${dtmp:-}" ] && [ -s "$dtmp" ]; then
       latest_rels=$(extract_diplomacy "$dtmp" | jq '.relationships')
+      # Also get combat pairs from latest save
+      local latest_combat
+      latest_combat=$(extract_combat_pairs "$dtmp")
+      if [ "$(echo "$latest_combat" | jq 'length')" -gt 0 ]; then
+        all_combat=$(echo "$all_combat" | jq --argjson p "$latest_combat" '. + $p | unique')
+      fi
       rm -f "$dtmp"
     else
       latest_rels="[]"
@@ -546,17 +621,64 @@ build_diplomacy() {
     latest_rels="[]"
   fi
 
+  # Upgrade Contact → War for pairs that have had actual combat
+  if [ "$(echo "$all_combat" | jq 'length')" -gt 0 ]; then
+    latest_rels=$(echo "$latest_rels" | jq --argjson cp "$all_combat" '
+      [.[] | if .status == "Contact" then
+        (.players | sort) as $sp |
+        if any($cp[]; sort == $sp) then .status = "War" else . end
+      else . end]')
+  fi
+
+  # Include the latest turn number for incremental rebuild checks
+  local latest_turn
+  latest_turn=$(echo "$SAVE_FILES" | tail -1 | awk '{print $1}')
   jq -n \
+    --argjson turn "${latest_turn:-0}" \
     --argjson current "$latest_rels" \
     --argjson events "$history" \
-    '{current: $current, events: $events}'
+    --argjson combat_pairs "$all_combat" \
+    '{turn: $turn, current: $current, events: $events, combat_pairs: $combat_pairs}'
 }
 
-echo "[status-json] Building diplomacy data..."
-DIPLOMACY_JSON=$(build_diplomacy)
-echo "$DIPLOMACY_JSON" > "$DIPLOMACY_FILE.tmp"
-mv "$DIPLOMACY_FILE.tmp" "$DIPLOMACY_FILE"
-echo "[status-json] Diplomacy: $(echo "$DIPLOMACY_JSON" | jq '.current | length') active relationships, $(echo "$DIPLOMACY_JSON" | jq '.events | length') events"
+# Only rebuild diplomacy when a new turn exists or the file is missing/corrupt
+NEED_DIPLO_REBUILD=false
+if [ ! -f "$DIPLOMACY_FILE" ] || ! jq . "$DIPLOMACY_FILE" >/dev/null 2>&1; then
+  NEED_DIPLO_REBUILD=true
+else
+  DIPLO_LAST_TURN=$(jq '.turn // 0' "$DIPLOMACY_FILE" 2>/dev/null || echo 0)
+  if [ "${TURN:-0}" -gt "$DIPLO_LAST_TURN" ] 2>/dev/null; then
+    NEED_DIPLO_REBUILD=true
+  fi
+fi
+
+if [ "$NEED_DIPLO_REBUILD" = "true" ]; then
+  echo "[status-json] Building diplomacy data..."
+  DIPLOMACY_JSON=$(build_diplomacy)
+  echo "$DIPLOMACY_JSON" > "$DIPLOMACY_FILE.tmp"
+  mv "$DIPLOMACY_FILE.tmp" "$DIPLOMACY_FILE"
+  echo "[status-json] Diplomacy: $(echo "$DIPLOMACY_JSON" | jq '.current | length') active relationships, $(echo "$DIPLOMACY_JSON" | jq '.events | length') events"
+else
+  # Just update current relationships from the latest save (fast path)
+  if [ -n "${LATEST_TMPFILE:-}" ] && [ -s "$LATEST_TMPFILE" ]; then
+    CURRENT_RELS=$(extract_diplomacy "$LATEST_TMPFILE" | jq '.relationships')
+    # Check for new combat events and merge with existing
+    NEW_COMBAT=$(extract_combat_pairs "$LATEST_TMPFILE")
+    EXISTING_COMBAT=$(jq '.combat_pairs // []' "$DIPLOMACY_FILE")
+    MERGED_COMBAT=$(echo "$EXISTING_COMBAT" | jq --argjson n "$NEW_COMBAT" '. + $n | unique')
+    # Upgrade Contact → War for combat pairs
+    if [ "$(echo "$MERGED_COMBAT" | jq 'length')" -gt 0 ]; then
+      CURRENT_RELS=$(echo "$CURRENT_RELS" | jq --argjson cp "$MERGED_COMBAT" '
+        [.[] | if .status == "Contact" then
+          (.players | sort) as $sp |
+          if any($cp[]; sort == $sp) then .status = "War" else . end
+        else . end]')
+    fi
+    jq --argjson rels "$CURRENT_RELS" --argjson cp "$MERGED_COMBAT" \
+      '.current = $rels | .combat_pairs = $cp' "$DIPLOMACY_FILE" > "$DIPLOMACY_FILE.tmp"
+    mv "$DIPLOMACY_FILE.tmp" "$DIPLOMACY_FILE"
+  fi
+fi
 
 # Symlink diplomacy.json into webroot for HTTP serving
 ln -sf "$DIPLOMACY_FILE" "$WEBROOT/diplomacy.json"

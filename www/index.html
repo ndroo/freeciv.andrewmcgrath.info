@@ -434,7 +434,7 @@
     var treaties = [];
     var contacts = [];
     current.forEach(function(r) {
-      if (r.status === 'War' && r.closest === 'War') {
+      if (r.status === 'Contact') {
         contacts.push(r);
       } else {
         treaties.push(r);
@@ -491,7 +491,7 @@
       if (diplomacy && diplomacy.events) {
         diplomacy.events.forEach(function(e) {
           if (e.turn !== curr.turn) return;
-          if (e.to === 'War' && e.from === 'Never met') items.push({icon: '\u{1F30D}', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> made first contact'});
+          if (e.to === 'Contact') items.push({icon: '\u{1F30D}', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> made first contact'});
           else if (e.to === 'War') items.push({icon: '\u2694\uFE0F', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> are now at war!'});
           else if (e.to === 'Peace') items.push({icon: '\u{1F54A}\uFE0F', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> signed a peace treaty'});
           else if (e.to === 'Alliance') items.push({icon: '\u{1F91D}', text: '<strong>' + esc(e.players[0]) + '</strong> and <strong>' + esc(e.players[1]) + '</strong> formed an alliance'});

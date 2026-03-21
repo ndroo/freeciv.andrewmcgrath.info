@@ -256,6 +256,13 @@ fi
           /opt/freeciv/generate_gazette.sh "$turn" "$year" >> /data/saves/gazette.log 2>&1
           echo "[turn-watcher] Triggering notification for turn $turn"
           /opt/freeciv/turn_notify.sh "$turn" "$year" &
+
+          # Clean up archived saves from previous turns: keep only the last one per turn
+          for old_turn in $(ls "$SAVE_DIR/archived/" 2>/dev/null | sed 's/lt-game-\([0-9]*\)-.*/\1/' | sort -n | uniq); do
+            [ "$old_turn" -ge "$turn" ] 2>/dev/null && continue
+            ls -1t "$SAVE_DIR/archived/lt-game-${old_turn}-"*.sav.gz 2>/dev/null | tail -n +2 | xargs rm -f 2>/dev/null
+          done
+          echo "[turn-watcher] Cleaned up old archived saves"
         fi
       fi
     fi

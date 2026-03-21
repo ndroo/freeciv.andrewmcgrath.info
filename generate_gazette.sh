@@ -112,7 +112,7 @@ build_turn_context() {
       diplomacy_events: [
         $dipl_events[] | {
           players: .players,
-          type: (if .to == "War" and .from == "Never met" then "first_contact"
+          type: (if .to == "Contact" then "first_contact"
                  elif .to == "War" then "war_declared"
                  elif .to == "Peace" then "peace_signed"
                  elif .to == "Alliance" then "alliance_formed"
