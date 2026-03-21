@@ -13,6 +13,14 @@ FROM_EMAIL="${FROM_EMAIL:-freeciv@andrewmcgrath.info}"
 SERVER_HOST="${SERVER_HOST:-freeciv.andrewmcgrath.info}"
 CC_EMAIL="${CC_EMAIL:-}"
 REMINDER_MARKER="/tmp/reminder-sent-turn"
+TEST_TO=""
+DRY_RUN=""
+for arg in "$@"; do
+  case "$arg" in
+    --test=*) TEST_TO="${arg#--test=}" ;;
+    --dry-run) DRY_RUN=true ;;
+  esac
+done
 
 echo "[turn-reminder] Started"
 
@@ -29,18 +37,20 @@ if [ -z "$SES_SMTP_USER" ] || [ -z "$SES_SMTP_PASS" ]; then
 fi
 
 while true; do
-  sleep 60
+  [ -z "$TEST_TO" ] && [ -z "$DRY_RUN" ] && sleep 60
 
   # Get current turn from latest save
   LATEST_SAVE=$(ls -1t "$SAVE_DIR"/lt-game-*.sav.* 2>/dev/null | head -1)
-  [ -z "$LATEST_SAVE" ] && continue
+  [ -z "$LATEST_SAVE" ] && { [ -n "$TEST_TO" ] || [ -n "$DRY_RUN" ] && exit 1; continue; }
 
   CURRENT_TURN=$(echo "$LATEST_SAVE" | sed 's/.*lt-game-\([0-9]*\)[.-].*/\1/')
-  [ -z "$CURRENT_TURN" ] && continue
+  [ -z "$CURRENT_TURN" ] && { [ -n "$TEST_TO" ] || [ -n "$DRY_RUN" ] && exit 1; continue; }
 
-  # Skip if we already sent a reminder for this turn
-  LAST_REMINDED=$(cat "$REMINDER_MARKER" 2>/dev/null || echo 0)
-  [ "$LAST_REMINDED" = "$CURRENT_TURN" ] && continue
+  # Skip if we already sent a reminder for this turn (not in test mode)
+  if [ -z "$TEST_TO" ] && [ -z "$DRY_RUN" ]; then
+    LAST_REMINDED=$(cat "$REMINDER_MARKER" 2>/dev/null || echo 0)
+    [ "$LAST_REMINDED" = "$CURRENT_TURN" ] && continue
+  fi
 
   # Calculate deadline: turn start time + timeout
   # Use stored turn start epoch (immune to auto-saver overwriting save file mtime)
@@ -48,7 +58,7 @@ while true; do
   if [ "$TURN_START_EPOCH" = "0" ]; then
     TURN_START_EPOCH=$(stat -c %Y "$LATEST_SAVE" 2>/dev/null || echo 0)
   fi
-  [ "$TURN_START_EPOCH" = "0" ] && continue
+  [ "$TURN_START_EPOCH" = "0" ] && { [ -n "$TEST_TO" ] || [ -n "$DRY_RUN" ] && exit 1; continue; }
 
   # Read timeout from save file (format: "timeout",value,default,"status")
   TIMEOUT=$(zcat "$LATEST_SAVE" 2>/dev/null | grep '^"timeout",' | head -1 | cut -d',' -f2)
@@ -58,8 +68,8 @@ while true; do
   NOW=$(date +%s)
   REMAINING=$((DEADLINE - NOW))
 
-  # Only send if we're within the 2-hour window (and more than 1 min left)
-  if [ "$REMAINING" -gt 60 ] && [ "$REMAINING" -le 7200 ]; then
+  # Only send if we're within the 2-hour window (or in test mode)
+  if [ -n "$TEST_TO" ] || [ -n "$DRY_RUN" ] || { [ "$REMAINING" -gt 60 ] && [ "$REMAINING" -le 7200 ]; }; then
     echo "[turn-reminder] Turn $CURRENT_TURN: ${REMAINING}s remaining — checking who hasn't finished"
 
     # Force a snapshot to get current phase_done state
@@ -128,31 +138,28 @@ while true; do
       TIME_LEFT="${REM_MINS} minutes"
     fi
 
-    # Build the "who's waiting on you" list
-    DONE_LIST=""
-    NOT_DONE_LIST=""
-    for i in $(seq 0 $((NUM_PLAYERS - 1))); do
-      SECTION=$(sed -n "/^\[player${i}\]/,/^\[/p" "$SNAP_TMP" 2>/dev/null | head -150)
-      # Re-read from main save since snap is deleted — use the slacker list instead
-      true
-    done
+    # Build waiting list HTML once (used in all emails)
+    WAITING_HTML=""
+    while IFS= read -r sn; do
+      [ -z "$sn" ] && continue
+      WAITING_HTML="${WAITING_HTML}<span style='color:#e94560;'>&#x23F3; ${sn}</span><br>"
+    done <<EOF_SLACKERS
+$SLACKER_LIST
+EOF_SLACKERS
 
-    # Send emails only to slackers
-    echo "$SLACKER_LIST" | while read -r SLACKER_NAME; do
+    # Send emails only to slackers — use here-string to avoid subshell
+    while IFS= read -r SLACKER_NAME; do
       [ -z "$SLACKER_NAME" ] && continue
 
-      # Look up email from database
-      SLACKER_EMAIL=$(sqlite3 "$DB_PATH" "SELECT email FROM fcdb_auth WHERE name='$SLACKER_NAME' AND email IS NOT NULL AND email != '';" 2>/dev/null)
-      [ -z "$SLACKER_EMAIL" ] && continue
+      # Look up email from database (or use test address)
+      if [ -n "$TEST_TO" ]; then
+        SLACKER_EMAIL="$TEST_TO"
+      else
+        SLACKER_EMAIL=$(sqlite3 "$DB_PATH" "SELECT email FROM fcdb_auth WHERE name='$SLACKER_NAME' AND email IS NOT NULL AND email != '';" 2>/dev/null)
+        [ -z "$SLACKER_EMAIL" ] && continue
+      fi
 
       echo "[turn-reminder] Nudging $SLACKER_NAME ($SLACKER_EMAIL)"
-
-      # Build list of who's done and who's not for the email
-      WAITING_HTML=""
-      echo "$SLACKER_LIST" | while read -r sn; do
-        [ -z "$sn" ] && continue
-        WAITING_HTML="${WAITING_HTML}<span style='color:#e94560;'>&#x23F3; ${sn}</span><br>"
-      done
 
       EMAIL_MSG=$(cat <<EMAILEOF
 From: Freeciv Server <$FROM_EMAIL>
@@ -209,23 +216,33 @@ Content-Type: text/html; charset=UTF-8
 EMAILEOF
 )
 
-      echo "$EMAIL_MSG" | curl -s --url "smtps://$SES_SMTP_HOST:465" \
-        --ssl-reqd \
-        --mail-from "$FROM_EMAIL" \
-        --mail-rcpt "$SLACKER_EMAIL" \
-        ${CC_EMAIL:+--mail-rcpt "$CC_EMAIL"} \
-        --user "$SES_SMTP_USER:$SES_SMTP_PASS" \
-        --upload-file - 2>&1
-
-      if [ $? -eq 0 ]; then
-        echo "[turn-reminder] Sent reminder to $SLACKER_EMAIL"
+      if [ -n "$DRY_RUN" ]; then
+        echo "[turn-reminder] DRY RUN — would send to $SLACKER_NAME ($SLACKER_EMAIL)"
       else
-        echo "[turn-reminder] Failed to send to $SLACKER_EMAIL"
-      fi
-    done
+        echo "$EMAIL_MSG" | curl -s --url "smtps://$SES_SMTP_HOST:465" \
+          --ssl-reqd \
+          --mail-from "$FROM_EMAIL" \
+          --mail-rcpt "$SLACKER_EMAIL" \
+          ${CC_EMAIL:+--mail-rcpt "$CC_EMAIL"} \
+          --user "$SES_SMTP_USER:$SES_SMTP_PASS" \
+          --upload-file - 2>&1
 
-    # Mark this turn as reminded so we don't spam
-    echo "$CURRENT_TURN" > "$REMINDER_MARKER"
+        if [ $? -eq 0 ]; then
+          echo "[turn-reminder] Sent reminder to $SLACKER_EMAIL"
+        else
+          echo "[turn-reminder] Failed to send to $SLACKER_EMAIL"
+        fi
+      fi
+    done <<EOF_SEND
+$SLACKER_LIST
+EOF_SEND
+
+    # Mark this turn as reminded so we don't spam (skip in test mode)
+    if [ -z "$TEST_TO" ] && [ -z "$DRY_RUN" ]; then
+      echo "$CURRENT_TURN" > "$REMINDER_MARKER"
+    fi
     echo "[turn-reminder] Done — reminders sent for turn $CURRENT_TURN"
+    [ -n "$TEST_TO" ] || [ -n "$DRY_RUN" ] && exit 0
   fi
+  [ -n "$TEST_TO" ] || [ -n "$DRY_RUN" ] && { echo "[turn-reminder] No slackers found or timing window missed"; exit 0; }
 done
