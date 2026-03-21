@@ -131,16 +131,26 @@ if [ -f "$GAZETTE_JSON" ] && jq . "$GAZETTE_JSON" >/dev/null 2>&1; then
       GZ_FRONT=$(echo "$GAZETTE_ENTRY" | jq -r '.sections.front_page.content // .sections.front_page // empty')
       GZ_FRONT_BY=$(echo "$GAZETTE_ENTRY" | jq -r '.sections.front_page.byline // empty')
       GZ_TURN=$(echo "$GAZETTE_ENTRY" | jq -r '.turn // empty')
+      GZ_IMG=$(echo "$GAZETTE_ENTRY" | jq -r '.illustration // empty')
+      GZ_IMG_CREDIT=$(echo "$GAZETTE_ENTRY" | jq -r '.illustration_caption.credit // empty')
+      GZ_IMG_DESC=$(echo "$GAZETTE_ENTRY" | jq -r '.illustration_caption.description // empty' | sed 's/<[^>]*>//g')
 
       GAZETTE_HTML="
-    <div style='background:#111827;border:1px solid #2a2a4a;border-radius:8px;padding:20px 24px;margin:0 0 24px 0;'>
-      <div style='color:#e94560;font-size:10px;text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-bottom:8px;'>The Civ Chronicle &middot; Turn ${GZ_TURN} &middot; ${GZ_YEAR}</div>
-      <div style='color:#fff;font-size:17px;font-weight:800;line-height:1.3;margin-bottom:4px;'>${GZ_HEADLINE}</div>
-      <div style='color:#537895;font-size:11px;font-style:italic;margin-bottom:10px;'>${GZ_FRONT_BY}</div>
-      <div style='color:#b0bdd0;font-size:13px;line-height:1.7;'>${GZ_FRONT}</div>
-      <div style='text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid #2a2a4a;'>
-        <a href='https://${SERVER_HOST}/#gazette' style='display:inline-block;background:#e94560;color:#fff;padding:10px 28px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;'>Read the full issue &rarr;</a>
+    <div style='background:#f5f0e6;border:none;padding:0;margin:0 0 24px 0;font-family:Georgia,Times New Roman,serif;color:#1a1a1a;'>
+      <div style='text-align:center;padding:20px 24px 12px;border-bottom:4px double #1a1a1a;'>
+        <div style='font-size:36px;font-weight:900;color:#1a1a1a;letter-spacing:2px;font-family:Georgia,serif;line-height:1;'>The Civ Chronicle</div>
+        <div style='font-size:10px;color:#666;text-transform:uppercase;letter-spacing:4px;margin-top:6px;'>All the civilization that&rsquo;s fit to print</div>
       </div>
+      <div style='display:flex;justify-content:space-between;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:1px;padding:6px 24px;border-bottom:1px solid #ccc;'>
+        <span>Turn ${GZ_TURN}</span><span>${GZ_YEAR}</span><span>Vol. I, No. ${GZ_TURN}</span>
+      </div>
+      <div style='font-size:24px;font-weight:900;color:#1a1a1a;line-height:1.2;letter-spacing:-0.5px;font-family:Georgia,serif;text-align:center;padding:18px 24px 6px;'>${GZ_HEADLINE}</div>
+      <div style='font-size:11px;color:#666;text-align:center;font-style:italic;padding:0 24px 14px;border-bottom:1px solid #ccc;'>${GZ_FRONT_BY}</div>
+      <div style='padding:14px 24px;font-size:13px;line-height:1.7;color:#2a2a2a;text-align:justify;overflow:hidden;'>$([ -n "$GZ_IMG" ] && echo "<div style='float:right;width:160px;margin:0 0 10px 14px;'><img src='https://${SERVER_HOST}/${GZ_IMG}' alt='Chronicle illustration' width='160' style='width:160px;height:auto;border:1px solid #999;display:block;' /><div style='font-size:8px;color:#888;text-align:center;margin-top:4px;line-height:1.3;'><em>${GZ_IMG_DESC}</em><br>${GZ_IMG_CREDIT}</div></div>")${GZ_FRONT}</div>
+      <div style='text-align:center;padding:12px 24px 18px;border-top:1px solid #ccc;'>
+        <a href='https://${SERVER_HOST}/#gazette' style='display:inline-block;background:#1a1a1a;color:#f5f0e6;padding:10px 28px;font-size:13px;font-weight:700;text-decoration:none;font-family:Georgia,serif;'>Read the full issue &rarr;</a>
+      </div>
+      <div style='text-align:center;padding:8px;border-top:4px double #1a1a1a;font-size:9px;color:#888;text-transform:uppercase;letter-spacing:2px;'>The Civ Chronicle</div>
     </div>"
       echo "[turn_notify] Including gazette in email: $GZ_HEADLINE"
     elif [ -n "$GZ_HEADLINE" ]; then
