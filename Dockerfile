@@ -22,6 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN wget -q "https://downloads.sourceforge.net/project/freeciv/Freeciv%203.2/3.2.3/freeciv-3.2.3.tar.xz" -O /tmp/freeciv.tar.xz && \
     cd /tmp && tar xf freeciv.tar.xz
 
+# Apply security patches (CVE-2026-33250: recursive jumbo packet DoS)
+COPY patches/ /tmp/patches/
+RUN chmod +x /tmp/patches/*.sh && /tmp/patches/apply-CVE-2026-33250.sh /tmp/freeciv-3.2.3
+
 RUN cd /tmp/freeciv-3.2.3 && \
     ./configure \
       --prefix=/usr/local \
