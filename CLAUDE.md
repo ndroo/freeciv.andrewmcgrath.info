@@ -1,7 +1,7 @@
 # Freeciv Longturn Server
 
 ## Project Overview
-A Freeciv 3.2.3 longturn server running on Fly.io (`freeciv-longturn`) with 23-hour turns, email notifications, and a status page.
+A Freeciv 3.2.4 longturn server running on Fly.io (`freeciv-longturn`) with 23-hour turns, email notifications, and a status page.
 
 ## Deployment
 - **Platform**: Fly.io, app name `freeciv-longturn`
