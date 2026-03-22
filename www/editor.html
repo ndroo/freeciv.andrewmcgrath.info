@@ -72,7 +72,7 @@
   <div class="editor-footer">All the civilization that's fit to print</div>
 </div>
 
-<div class="back-link"><a href="/">&larr; Back to game status</a></div>
+<div class="back-link"><a href="/">&larr; Back to game status</a><span id="admin-link"></span></div>
 
 <script>
 var token = sessionStorage.getItem('editorToken');
@@ -81,8 +81,20 @@ var pollTimer = null;
 
 function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+function checkAdmin() {
+  if (!token) return;
+  fetch('/cgi-bin/editor-admin?token=' + token)
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      document.getElementById('admin-link').innerHTML =
+        ' &middot; <a href="/admin.html" style="font-size:11px;color:#537895;text-decoration:none;">Admin</a>';
+    }
+  }).catch(function() {});
+}
+
 function init() {
-  if (token) { showChat(); } else { showLogin(); }
+  if (token) { showChat(); checkAdmin(); } else { showLogin(); }
 }
 
 function showLogin() {
