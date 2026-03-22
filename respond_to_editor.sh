@@ -39,10 +39,16 @@ if [ -f "$SCRIPT_DIR/email_enabled.settings" ]; then
 fi
 
 # Parse args
+# Usage: ./respond_to_editor.sh [--outreach] [player1 player2 ...]
+#   --outreach: run proactive outreach (AI picks players, or use specified list)
+#   player names after --outreach override the AI picker
 DO_OUTREACH=false
+OUTREACH_PLAYERS=""
 for arg in "$@"; do
   case "$arg" in
     --outreach) DO_OUTREACH=true ;;
+    -*) ;;
+    *) [ "$DO_OUTREACH" = "true" ] && OUTREACH_PLAYERS="$OUTREACH_PLAYERS $arg" ;;
   esac
 done
 
@@ -489,11 +495,27 @@ if [ "$DO_OUTREACH" = "true" ] && [ -f "$STATUS_FILE" ]; then
       WHERE role='player' AND turn=$TURN
     );" 2>/dev/null || echo "0")
 
-  if [ "${OUTREACH_INITIATED:-0}" -ge 3 ]; then
+  if [ -n "$OUTREACH_PLAYERS" ]; then
+    echo "[editor] Manual outreach to:$OUTREACH_PLAYERS"
+  elif [ "${OUTREACH_INITIATED:-0}" -ge 3 ]; then
     echo "[editor] Already reached out to $OUTREACH_INITIATED players this turn, skipping"
-  else
+  fi
+
+  if [ -n "$OUTREACH_PLAYERS" ] || [ "${OUTREACH_INITIATED:-0}" -lt 3 ]; then
+
+   if [ -n "$OUTREACH_PLAYERS" ]; then
+    # Manual player list — resolve case-insensitive names against real players
+    PICKS_JSON="[]"
+    for manual_name in $OUTREACH_PLAYERS; do
+      REAL_NAME=$(jq -r --arg p "$manual_name" '.players[] | select(.name | ascii_downcase == ($p | ascii_downcase)) | .name' "$STATUS_FILE" 2>/dev/null)
+      if [ -n "$REAL_NAME" ]; then
+        PICKS_JSON=$(echo "$PICKS_JSON" | jq --arg n "$REAL_NAME" '. + [{"name":$n,"reason":"Manual outreach requested"}]')
+      else
+        echo "[editor] Unknown player: $manual_name, skipping"
+      fi
+    done
+   else
     # Pick interesting players using AI
-    # Give it the game state and ask who to contact
     PICK_PROMPT="You are the editor-in-chief of The Civ Chronicle. You need quotes and comments for the next issue. Pick 1-3 players to contact — but ONLY if you have a genuine story angle that warrants their comment. Don't bother people without a reason. Consider:
 - Players directly involved in wars, new alliances, or diplomatic shifts THIS turn
 - Players who just achieved something major (wonders, spaceship, dramatic score change)
@@ -517,6 +539,7 @@ Keep reasons under 20 words. Do NOT explain outside the JSON. Output ONLY the JS
     PICKS_RAW=$(call_ai "$PICK_PROMPT" '[{"role":"user","content":"Return only the JSON array of 1-3 player objects with name and reason. Keep reasons under 20 words each."}]' 300)
     # Strip markdown code fences if present
     PICKS_JSON=$(echo "$PICKS_RAW" | sed '/^```/d' | jq -c '.' 2>/dev/null || echo "[]")
+   fi  # end manual vs AI picker
 
     # Parse picks — try structured JSON first, fall back to name extraction
     PICK_COUNT=$(echo "$PICKS_JSON" | jq 'length' 2>/dev/null || echo 0)
