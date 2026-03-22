@@ -150,6 +150,7 @@ function doLogin() {
       sessionStorage.setItem('editorToken', d.token);
       sessionStorage.setItem('editorPlayer', d.player);
       showChat();
+      checkAdmin();
     } else { err.textContent = d.error || 'Login failed'; }
   }).catch(function() { err.textContent = 'Connection error'; });
 }
