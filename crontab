@@ -1,4 +1,2 @@
 # Status page regeneration — runs every 5 minutes
 */5 * * * * /opt/freeciv/generate_status_json.sh >> /data/saves/status-generator.log 2>&1
-# Editor responses — runs hourly
-0 * * * * /opt/freeciv/respond_to_editor.sh >> /data/saves/editor.log 2>&1

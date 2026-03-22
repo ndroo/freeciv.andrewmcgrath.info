@@ -332,7 +332,21 @@ fi
   done
 ) &
 
-# Process 6: Turn reminder (nudge emails 2 hours before deadline)
+# Process 6: Editor responder — replies to player messages every hour
+(
+  while ! grep -q "Now accepting" "$LOGFILE" 2>/dev/null; do
+    sleep 1
+  done
+  sleep 30
+  echo "[editor-loop] Started — checking for messages every hour"
+  while true; do
+    sleep 3600
+    /opt/freeciv/respond_to_editor.sh >> /data/saves/editor.log 2>&1
+    echo "[editor-loop] Ran at $(date)"
+  done
+) &
+
+# Process 7: Turn reminder (nudge emails 2 hours before deadline)
 /opt/freeciv/turn_reminder.sh &
 
 # Generate static nations page (runs once)
