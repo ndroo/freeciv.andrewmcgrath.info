@@ -29,26 +29,41 @@ DASHBOARD_DIR="${SAVE_DIR}/dashboard"
 mkdir -p "$DASHBOARD_DIR"
 
 # ---------------------------------------------------------------------------
+# Parse a quoted CSV line into a JSON array (handles commas inside quotes)
+# Works with awk only — no python3 needed
+# ---------------------------------------------------------------------------
+csv_to_json_array() {
+  awk '
+  BEGIN { printf "[" }
+  {
+    n = length($0); inquote=0; field=""; first=1
+    for (i=1; i<=n; i++) {
+      c = substr($0, i, 1)
+      if (c == "\"") { inquote = !inquote; continue }
+      if (c == "," && !inquote) {
+        if (!first) printf ","
+        gsub(/\\/, "\\\\", field); gsub(/"/, "\\\"", field)
+        printf "\"%s\"", field
+        field = ""; first = 0; continue
+      }
+      field = field c
+    }
+    if (!first) printf ","
+    gsub(/\\/, "\\\\", field); gsub(/"/, "\\\"", field)
+    printf "\"%s\"", field
+  }
+  END { print "]" }
+  '
+}
+
+# ---------------------------------------------------------------------------
 # Parse lookup vectors from a save file (improvement names, tech names)
-# Uses python3 csv module for proper quoted-CSV parsing
 # ---------------------------------------------------------------------------
 parse_vectors() {
   local savefile="$1"
 
-  # Parse into JSON arrays for reliable lookup
-  IMP_VECTOR_JSON=$(grep '^improvement_vector=' "$savefile" | sed 's/^improvement_vector=//' | python3 -c "
-import csv, json, sys
-reader = csv.reader(sys.stdin)
-for row in reader:
-    print(json.dumps(row))
-" 2>/dev/null || echo "[]")
-
-  TECH_VECTOR_JSON=$(grep '^technology_vector=' "$savefile" | sed 's/^technology_vector=//' | python3 -c "
-import csv, json, sys
-reader = csv.reader(sys.stdin)
-for row in reader:
-    print(json.dumps(row))
-" 2>/dev/null || echo "[]")
+  IMP_VECTOR_JSON=$(grep '^improvement_vector=' "$savefile" | sed 's/^improvement_vector=//' | csv_to_json_array)
+  TECH_VECTOR_JSON=$(grep '^technology_vector=' "$savefile" | sed 's/^technology_vector=//' | csv_to_json_array)
 }
 
 # ---------------------------------------------------------------------------
@@ -147,46 +162,44 @@ extract_player_data() {
   ' "$savefile")
 
   if [ -n "$city_block" ]; then
-    cities_json=$(echo "$city_block" | python3 -c "
-import csv, json, sys
-
-lines = sys.stdin.read().strip().split('\n')
-if not lines:
-    print('[]')
-    sys.exit(0)
-
-# Parse header
-header_line = lines[0]
-# Header is c={\"field1\",\"field2\",...}  — strip c={ and }
-header_str = header_line.replace('c={', '').rstrip('}')
-header = list(csv.reader([header_str]))[0]
-
-# Find field indices
-def idx(name):
-    try: return header.index(name)
-    except ValueError: return -1
-
-i_name = idx('name')
-i_size = idx('size')
-i_building_name = idx('currently_building_name')
-i_improvements = idx('improvements')
-i_turn_founded = idx('turn_founded')
-
-cities = []
-for line in lines[1:]:
-    row = list(csv.reader([line]))[0]
-    if len(row) < max(i_name, i_size, i_building_name, i_improvements, i_turn_founded) + 1:
-        continue
-    imp_bitmask = row[i_improvements] if i_improvements >= 0 else ''
-    cities.append({
-        'name': row[i_name] if i_name >= 0 else '',
-        'size': int(row[i_size]) if i_size >= 0 else 0,
-        'building': row[i_building_name] if i_building_name >= 0 else '',
-        'improvements_bitmask': imp_bitmask,
-        'turn_founded': int(row[i_turn_founded]) if i_turn_founded >= 0 else 0
-    })
-print(json.dumps(cities))
-" 2>/dev/null || echo "[]")
+    # Parse header to find field positions, then extract data rows
+    cities_json=$(echo "$city_block" | awk '
+    function parse_csv(line, fields,    n, i, c, inquote, field) {
+      n = 0; inquote = 0; field = ""
+      for (i = 1; i <= length(line); i++) {
+        c = substr(line, i, 1)
+        if (c == "\"") { inquote = !inquote; continue }
+        if (c == "," && !inquote) { fields[n++] = field; field = ""; continue }
+        field = field c
+      }
+      fields[n++] = field
+      return n
+    }
+    NR == 1 {
+      # Parse header: c={"field1","field2",...}
+      hdr = $0; sub(/^c=\{/, "", hdr); sub(/\}$/, "", hdr)
+      n = parse_csv(hdr, hfields)
+      for (i = 0; i < n; i++) {
+        if (hfields[i] == "name") i_name = i
+        if (hfields[i] == "size") i_size = i
+        if (hfields[i] == "currently_building_name") i_building = i
+        if (hfields[i] == "improvements") i_imp = i
+        if (hfields[i] == "turn_founded") i_founded = i
+      }
+      printf "["
+      next
+    }
+    NR > 1 {
+      n = parse_csv($0, f)
+      if (n < 5) next
+      gsub(/\\/, "\\\\", f[i_name]); gsub(/"/, "\\\"", f[i_name])
+      gsub(/\\/, "\\\\", f[i_building]); gsub(/"/, "\\\"", f[i_building])
+      if (NR > 2) printf ","
+      printf "{\"name\":\"%s\",\"size\":%s,\"building\":\"%s\",\"improvements_bitmask\":\"%s\",\"turn_founded\":%s}", \
+        f[i_name], f[i_size]+0, f[i_building], f[i_imp], f[i_founded]+0
+    }
+    END { print "]" }
+    ' 2>/dev/null || echo "[]")
 
     # Decode improvement bitmasks to names
     cities_json=$(echo "$cities_json" | jq -c --argjson imp_vec "$IMP_VECTOR_JSON" '
@@ -205,18 +218,24 @@ print(json.dumps(cities))
   local research_line techs_count researching goal techs_json
   research_line=$(awk '/^\[research\]/,/^\}/' "$savefile" | sed -n '/^r={/,/^}/p' | grep "^${player_idx},")
   if [ -n "$research_line" ]; then
+    # Header: number,goal_name,techs,futuretech,bulbs_before,saved_name,bulbs,now_name,free_bulbs,done
+    # Parse with awk CSV parser
     local research_parsed
-    research_parsed=$(echo "$research_line" | python3 -c "
-import csv, json, sys
-# Header: number,goal_name,techs,futuretech,bulbs_before,saved_name,bulbs,now_name,free_bulbs,done
-row = list(csv.reader(sys.stdin))[0]
-print(json.dumps({
-    'techs_count': int(row[2]),
-    'goal': row[1],
-    'researching': row[7],
-    'done_bitmask': row[9]
-}))
-" 2>/dev/null || echo '{}')
+    research_parsed=$(echo "$research_line" | awk '
+    {
+      n = 0; inquote = 0; field = ""
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        if (c == "\"") { inquote = !inquote; continue }
+        if (c == "," && !inquote) { fields[n++] = field; field = ""; continue }
+        field = field c
+      }
+      fields[n++] = field
+      # fields: 0=number, 1=goal, 2=techs, 3=futuretech, 4=bulbs_before, 5=saved, 6=bulbs, 7=now_name, 8=free_bulbs, 9=done
+      gsub(/"/, "\\\"", fields[1]); gsub(/"/, "\\\"", fields[7])
+      printf "{\"techs_count\":%d,\"goal\":\"%s\",\"researching\":\"%s\",\"done_bitmask\":\"%s\"}", \
+        fields[2]+0, fields[1], fields[7], fields[9]
+    }')
     techs_count=$(echo "$research_parsed" | jq -r '.techs_count // 0')
     researching=$(echo "$research_parsed" | jq -r '.researching // ""')
     goal=$(echo "$research_parsed" | jq -r '.goal // ""')
