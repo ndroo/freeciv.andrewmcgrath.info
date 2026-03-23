@@ -184,6 +184,8 @@ function loadConversation(playerName) {
           bubbles[i].innerHTML = '<p>' + h + '</p>';
         }
       });
+      var container = document.querySelector('.conv-messages');
+      if (container) container.scrollTop = container.scrollHeight;
     }
   });
 }
