@@ -90,23 +90,34 @@ if [ -n "$LATEST_SAVE" ]; then
   fi
   rm -f "$TMPFILE"
   # Calculate remaining turn time
-  # Use real_turn_start_epoch (the actual moment the turn began, survives restarts)
-  # rather than phase_seconds (gets zeroed each restart) or save timeout (gets reduced)
+  # Most reliable source: mtime of the PREVIOUS turn's save file.
+  # That's when the current turn started and it's immutable on disk.
+  # Falls back to real_turn_start_epoch, then phase_seconds.
   DEFAULT_TIMEOUT=82800
-  if [ -f "$REAL_TURN_START_FILE" ]; then
+  NOW_EPOCH=$(date +%s)
+  PREV_TURN_NUM=$((SAVE_TURN_NUM - 1))
+  PREV_SAVE="$SAVE_DIR/lt-game-${PREV_TURN_NUM}.sav.gz"
+  if [ -f "$PREV_SAVE" ]; then
+    # The previous turn's save was written at the moment the current turn started
+    TURN_ACTUAL_START=$(stat -c %Y "$PREV_SAVE" 2>/dev/null || stat -f %m "$PREV_SAVE" 2>/dev/null)
+    REAL_ELAPSED=$((NOW_EPOCH - TURN_ACTUAL_START))
+    RESUME_REMAINING=$((DEFAULT_TIMEOUT - REAL_ELAPSED))
+    echo "[startup] Turn $SAVE_TURN_NUM started when lt-game-${PREV_TURN_NUM}.sav.gz was written"
+    echo "[startup] Turn started ${REAL_ELAPSED}s ago ($(( REAL_ELAPSED / 3600 ))h $(( (REAL_ELAPSED % 3600) / 60 ))m), remaining=${RESUME_REMAINING}s"
+    # Update real_turn_start_epoch to match
+    echo "$TURN_ACTUAL_START" > "$REAL_TURN_START_FILE"
+  elif [ -f "$REAL_TURN_START_FILE" ]; then
     TURN_START_SAVED=$(cat "$REAL_TURN_START_FILE")
-    NOW_EPOCH=$(date +%s)
     REAL_ELAPSED=$((NOW_EPOCH - TURN_START_SAVED))
     RESUME_REMAINING=$((DEFAULT_TIMEOUT - REAL_ELAPSED))
-    echo "[startup] Using real_turn_start_epoch: started ${REAL_ELAPSED}s ago, remaining=${RESUME_REMAINING}s"
-    echo "[startup] (phase_seconds=$SAVE_PHASE_SECONDS, save_timeout=$SAVE_TIMEOUT — ignored, using default $DEFAULT_TIMEOUT)"
+    echo "[startup] Using real_turn_start_epoch (fallback): started ${REAL_ELAPSED}s ago, remaining=${RESUME_REMAINING}s"
   else
     RESUME_REMAINING=$((DEFAULT_TIMEOUT - SAVE_PHASE_SECONDS))
-    echo "[startup] No real_turn_start_epoch, using phase_seconds: remaining=${RESUME_REMAINING}s"
+    echo "[startup] No previous save or epoch file, using phase_seconds: remaining=${RESUME_REMAINING}s"
   fi
   if [ "$RESUME_REMAINING" -lt 60 ]; then
-    RESUME_REMAINING=0
-    echo "[startup] Turn had already expired, will use default 23hr timeout"
+    RESUME_REMAINING=60
+    echo "[startup] Turn has expired or nearly expired — will end in 60s"
   else
     echo "[startup] Remaining turn time: ${RESUME_REMAINING}s ($(( RESUME_REMAINING / 3600 ))h $(( (RESUME_REMAINING % 3600) / 60 ))m)"
   fi
@@ -292,6 +303,8 @@ fi
           /opt/freeciv/generate_status_json.sh >> /data/saves/status-generator.log 2>&1
           # Generate gazette before email so the email can include it
           /opt/freeciv/generate_gazette.sh "$turn" "$year" >> /data/saves/gazette.log 2>&1
+          # Generate player dashboards (incremental — diffs latest turn)
+          /opt/freeciv/generate_dashboard.sh >> /data/saves/dashboard.log 2>&1 &
           # Editor proactive outreach (contacts 1-2 interesting players per turn)
           /opt/freeciv/respond_to_editor.sh --outreach >> /data/saves/editor.log 2>&1 &
           echo "[turn-watcher] Triggering notification for turn $turn"
@@ -343,6 +356,20 @@ fi
     sleep 3600
     /opt/freeciv/respond_to_editor.sh >> /data/saves/editor.log 2>&1
     echo "[editor-loop] Ran at $(date)"
+  done
+) &
+
+# Process 8: Dashboard refresh — updates current state every 5 minutes
+(
+  while ! grep -q "Now accepting" "$LOGFILE" 2>/dev/null; do
+    sleep 1
+  done
+  sleep 60
+  echo "[dashboard-loop] Started — refreshing every 5 minutes"
+  while true; do
+    sleep 300
+    /opt/freeciv/generate_dashboard.sh >> /data/saves/dashboard.log 2>&1
+    echo "[dashboard-loop] Refreshed at $(date)"
   done
 ) &
 

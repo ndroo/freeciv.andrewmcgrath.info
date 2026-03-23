@@ -6,12 +6,12 @@
   <title>Write to the Editor — The Civ Chronicle</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#1a1a1a; font-family:'Georgia','Times New Roman',serif; color:#1a1a1a; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+    body { background:#1a1a1a; font-family:'Georgia','Times New Roman',serif; color:#1a1a1a; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:20px; }
     .editor-page { max-width:520px; width:100%; background:#f5f0e6; border:1px solid #d5d0c5; overflow:hidden; }
     .editor-masthead { text-align:center; padding:20px 24px 14px; border-bottom:3px double #1a1a1a; }
     .editor-masthead h1 { font-size:28px; font-weight:900; letter-spacing:1px; line-height:1; }
     .editor-masthead .sub { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:3px; margin-top:6px; }
-    .editor-masthead .tagline { font-size:11px; color:#666; font-style:italic; margin-top:8px; }
+    .editor-masthead .tagline { font-size:11px; color:#666; font-style:italic; margin-top:8px; min-height:16px; }
     .back-link { display:block; text-align:center; margin-top:14px; }
     .back-link a { font-size:11px; color:#537895; text-decoration:none; font-family:-apple-system,sans-serif; }
     .back-link a:hover { text-decoration:underline; }
@@ -44,6 +44,12 @@
     .editor-bar { font-size:10px; color:#888; text-align:center; padding:8px; border-top:1px solid #e5e0d5; font-style:italic; }
     .editor-bar a { color:#888; cursor:pointer; text-decoration:underline; }
     .editor-footer { text-align:center; padding:10px; border-top:3px double #1a1a1a; font-size:9px; color:#888; text-transform:uppercase; letter-spacing:2px; }
+    .site-nav { display:flex; justify-content:center; align-items:center; gap:14px; padding:7px 20px; border-bottom:1px solid #d5d0c5; background:#ede8d8; font-size:11px; font-family:-apple-system,BlinkMacSystemFont,sans-serif; }
+    .site-nav a { color:#537895; text-decoration:none; } .site-nav a:hover { text-decoration:underline; }
+    .site-nav .active { font-weight:700; color:#1a1a1a; }
+    .site-nav .sep { color:#ccc; }
+    .site-nav .right { margin-left:auto; color:#888; }
+    .site-nav .right a { color:#888; }
 
     .empty-state { font-size:13px; color:#888; text-align:center; padding:60px 20px; font-style:italic; line-height:1.6; }
 
@@ -59,6 +65,8 @@
     <div class="tagline">Write to the editor. Share tips, proclamations, or complaints.</div>
   </div>
 
+  <div id="site-nav"></div>
+
   <div id="editor-content">
     <div class="editor-login">
       <p>Sign in with your Freeciv game credentials to write to the editor.</p>
@@ -72,8 +80,6 @@
   <div class="editor-footer">All the civilization that's fit to print</div>
 </div>
 
-<div class="back-link"><a href="/">&larr; Back to game status</a><span id="admin-link"></span></div>
-
 <script>
 var token = sessionStorage.getItem('editorToken');
 var player = sessionStorage.getItem('editorPlayer');
@@ -81,20 +87,29 @@ var pollTimer = null;
 
 function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-function checkAdmin() {
-  if (!token) return;
-  fetch('/cgi-bin/editor-admin?token=' + token)
-  .then(function(r) { return r.json(); })
-  .then(function(d) {
-    if (d.ok) {
-      document.getElementById('admin-link').innerHTML =
-        ' &middot; <a href="/admin.html" style="font-size:11px;color:#537895;text-decoration:none;">Admin</a>';
-    }
-  }).catch(function() {});
+function buildNav() {
+  var nav = document.getElementById('site-nav');
+  if (!token) { nav.innerHTML = ''; return; }
+  var links = '<div class="site-nav">' +
+    '<a href="/">Game Status</a>' +
+    '<span class="sep">&middot;</span>' +
+    '<a href="/editor.html" class="active">Correspondence</a>' +
+    '<span class="sep">&middot;</span>' +
+    '<a href="/dashboard.html">Intelligence Briefing</a>' +
+    '<span class="right"><a href="#" id="nav-logout">Sign out (' + esc(player) + ')</a></span>' +
+    '</div>';
+  nav.innerHTML = links;
+  document.getElementById('nav-logout').addEventListener('click', function(e) {
+    e.preventDefault();
+    sessionStorage.removeItem('editorToken'); sessionStorage.removeItem('editorPlayer');
+    token = null; player = null;
+    if (pollTimer) clearInterval(pollTimer);
+    window.location.href = '/login.html';
+  });
 }
 
 function init() {
-  if (token) { showChat(); checkAdmin(); } else { showLogin(); }
+  if (token) { buildNav(); showChat(); } else { window.location.href = '/login.html?next=/editor.html'; }
 }
 
 function showLogin() {
@@ -114,19 +129,13 @@ function showChat() {
   document.getElementById('editor-content').innerHTML =
     '<div class="editor-chat">' +
     '<div class="editor-messages" id="msg-list"></div>' +
-    '<div class="editor-bar">The editor responds within the hour. <a id="logout-btn">Sign out (' + esc(player) + ')</a></div>' +
+    '<div class="editor-bar">The editor responds within the hour.</div>' +
     '<div class="editor-compose">' +
     '<textarea id="msg-input" placeholder="Write to the editor..." maxlength="9000"></textarea>' +
     '<div class="editor-compose-bar"><span class="hint">' + (navigator.platform.indexOf('Mac') >= 0 ? 'Cmd' : 'Ctrl') + '+Enter to send</span><button id="send-btn">Send</button></div></div></div>';
   document.getElementById('send-btn').addEventListener('click', doSend);
   document.getElementById('msg-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { doSend(); e.preventDefault(); }
-  });
-  document.getElementById('logout-btn').addEventListener('click', function() {
-    sessionStorage.removeItem('editorToken'); sessionStorage.removeItem('editorPlayer');
-    token = null; player = null;
-    if (pollTimer) clearInterval(pollTimer);
-    showLogin();
   });
   loadMessages();
   if (pollTimer) clearInterval(pollTimer);
@@ -149,8 +158,8 @@ function doLogin() {
       token = d.token; player = d.player;
       sessionStorage.setItem('editorToken', d.token);
       sessionStorage.setItem('editorPlayer', d.player);
+      buildNav();
       showChat();
-      checkAdmin();
     } else { err.textContent = d.error || 'Login failed'; }
   }).catch(function() { err.textContent = 'Connection error'; });
 }
@@ -167,7 +176,7 @@ function doSend() {
   }).then(function(r) { return r.json(); }).then(function(d) {
     input.disabled = false;
     if (d.ok) { loadMessages(); }
-    else if (d.error && d.error.indexOf('expired') >= 0) { token = null; showLogin(); }
+    else if (d.error && d.error.indexOf('expired') >= 0) { token = null; window.location.href = '/login.html?next=/editor.html'; }
     else {
       input.value = msg;
       var bar = document.querySelector('.editor-compose-bar .hint');
@@ -183,7 +192,7 @@ function loadMessages() {
   .then(function(r) { return r.json(); })
   .then(function(d) {
     if (!d.ok) {
-      if (d.error && d.error.indexOf('expired') >= 0) { token = null; showLogin(); }
+      if (d.error && d.error.indexOf('expired') >= 0) { token = null; window.location.href = '/login.html?next=/editor.html'; }
       return;
     }
     var list = document.getElementById('msg-list');

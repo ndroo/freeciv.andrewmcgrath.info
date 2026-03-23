@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intelligence Briefing — The Civ Chronicle</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#1a1a1a; font-family:'Georgia','Times New Roman',serif; color:#1a1a1a; min-height:100vh; padding:20px; }
+    .page { max-width:700px; margin:0 auto; background:#f5f0e6; border:1px solid #d5d0c5; }
+    .masthead { text-align:center; padding:20px 24px 14px; border-bottom:3px double #1a1a1a; }
+    .masthead h1 { font-size:28px; font-weight:900; letter-spacing:1px; line-height:1; }
+    .masthead .sub { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:3px; margin-top:6px; }
+    .masthead .tagline { font-size:11px; color:#666; font-style:italic; margin-top:8px; min-height:16px; }
+    .site-nav { display:flex; justify-content:center; align-items:center; gap:14px; padding:7px 20px; border-bottom:1px solid #d5d0c5; background:#ede8d8; font-size:11px; font-family:-apple-system,BlinkMacSystemFont,sans-serif; }
+    .site-nav a { color:#537895; text-decoration:none; } .site-nav a:hover { text-decoration:underline; }
+    .site-nav .active { font-weight:700; color:#1a1a1a; }
+    .site-nav .sep { color:#ccc; }
+    .site-nav .right { margin-left:auto; color:#888; }
+    .site-nav .right a { color:#888; }
+    .badge { background:#8b0000; color:#f5f0e6; padding:1px 6px; border-radius:8px; font-size:9px; font-family:sans-serif; margin-left:3px; }
+    .admin-bar { display:flex; align-items:center; gap:8px; padding:8px 20px; border-bottom:1px solid #d5d0c5; background:#e8e3d3; font-size:11px; }
+    .admin-bar select { font-family:'Georgia',serif; font-size:11px; padding:2px 6px; border:1px solid #ccc; background:#fff; }
+    .admin-bar label { color:#666; }
+    .content { padding:20px 24px; }
+    .footer { text-align:center; padding:10px; border-top:3px double #1a1a1a; font-size:9px; color:#888; text-transform:uppercase; letter-spacing:2px; }
+    .links { text-align:center; margin-top:14px; }
+    .links a { font-size:11px; color:#537895; text-decoration:none; font-family:-apple-system,sans-serif; }
+    .links a:hover { text-decoration:underline; }
+
+    /* Overview cards */
+    .overview { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:20px; }
+    .card { text-align:center; padding:12px 8px; background:#fff; border:1px solid #d5d0c5; min-height:68px; display:flex; flex-direction:column; justify-content:center; }
+    .card .val { font-size:18px; font-weight:bold; color:#1a1a1a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .card .lbl { font-size:9px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+
+    /* Sections */
+    .section { margin-bottom:20px; }
+    .section-title { font-size:12px; text-transform:uppercase; letter-spacing:2px; color:#888; border-bottom:1px solid #d5d0c5; padding-bottom:4px; margin-bottom:10px; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th { text-align:left; font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#888; padding:4px 8px; border-bottom:1px solid #d5d0c5; }
+    td { padding:6px 8px; border-bottom:1px solid #eee; }
+    .building { color:#537895; font-style:italic; }
+    .improvements { font-size:10px; color:#888; }
+    .diplo-status { display:inline-block; padding:1px 8px; border-radius:2px; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px; }
+    .diplo-alliance { background:#d4edda; color:#155724; } .diplo-peace { background:#d1ecf1; color:#0c5460; }
+    .diplo-war { background:#f8d7da; color:#721c24; } .diplo-other { background:#e2e3e5; color:#383d41; }
+    .unit-grid { display:flex; flex-wrap:wrap; gap:8px; }
+    .unit-chip { background:#fff; border:1px solid #d5d0c5; padding:4px 10px; font-size:12px; }
+    .unit-chip .count { font-weight:bold; margin-right:4px; }
+    .tech-list { display:flex; flex-wrap:wrap; gap:4px; }
+    .tech-tag, .researching-tag { padding:3px 8px; font-size:10px; border:1px solid #d5d0c5; background:#ede8d8; line-height:1.3; }
+    .researching-tag { background:#537895; color:#fff; border-color:#537895; }
+
+    /* Timeline */
+    .timeline { margin-top:10px; }
+    .turn-group { margin-bottom:12px; border:1px solid #d5d0c5; background:#fff; }
+    .turn-header { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#ede8d8; font-size:12px; }
+    .turn-header .turn-label { font-weight:bold; }
+    .turn-header .turn-year { color:#888; }
+    .turn-header .event-count { font-size:10px; color:#888; font-style:italic; }
+    .turn-events { padding:8px 12px; }
+    .event { padding:4px 0; font-size:12px; display:flex; align-items:baseline; gap:8px; }
+    .event-icon { width:14px; text-align:center; font-size:11px; flex-shrink:0; }
+    .ev-unit_built .event-icon { color:#22863a; } .ev-unit_lost .event-icon { color:#cb2431; }
+    .ev-city_founded .event-icon { color:#22863a; } .ev-building_completed .event-icon { color:#22863a; }
+    .ev-tech_researched .event-icon { color:#6f42c1; } .ev-government_changed .event-icon { color:#6f42c1; }
+    .ev-diplomacy_changed .event-icon { color:#0366d6; } .ev-score_change .event-icon { color:#888; }
+    .no-events { font-size:12px; color:#888; font-style:italic; text-align:center; padding:40px 20px; }
+    .loading { text-align:center; padding:60px 20px; color:#888; font-style:italic; }
+
+    @media(max-width:560px) {
+      .page { border:none; } body { padding:0; }
+      .overview { grid-template-columns:repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+  <div class="masthead">
+    <h1>The Civ Chronicle</h1>
+    <div class="sub">Personal Intelligence Briefing</div>
+    <div class="tagline">Your empire at a glance. Updated every turn.</div>
+  </div>
+  <div id="site-nav"></div>
+  <div id="admin-bar"></div>
+  <div class="content" id="content"><div class="loading">Loading briefing...</div></div>
+  <div class="footer">Eyes only &mdash; for the named recipient</div>
+</div>
+
+<script>
+var token = sessionStorage.getItem('editorToken');
+var player = sessionStorage.getItem('editorPlayer');
+
+if (!token) { window.location.href = '/login.html?next=/dashboard.html'; }
+
+function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function buildNav(d) {
+  var nav = document.getElementById('site-nav');
+  var editorLabel = 'Correspondence';
+  if (d && d.editor_unread > 0) editorLabel += ' <span class="badge">' + d.editor_unread + ' new</span>';
+  var adminLink = '';
+  if (d && d.is_admin) adminLink = '<span class="sep">&middot;</span><a href="/admin.html">Admin</a>';
+  nav.innerHTML = '<div class="site-nav">' +
+    '<a href="/">Game Status</a>' +
+    '<span class="sep">&middot;</span>' +
+    '<a href="/editor.html">' + editorLabel + '</a>' +
+    '<span class="sep">&middot;</span>' +
+    '<a href="/dashboard.html" class="active">Intelligence Briefing</a>' +
+    adminLink +
+    '<span class="right"><a href="#" id="nav-logout">Sign out (' + esc(player) + ')</a></span>' +
+    '</div>';
+  document.getElementById('nav-logout').addEventListener('click', function(e) {
+    e.preventDefault();
+    sessionStorage.removeItem('editorToken'); sessionStorage.removeItem('editorPlayer');
+    window.location.href = '/login.html?next=/dashboard.html';
+  });
+}
+
+var EVENT_ICONS = {
+  unit_built: '+', unit_lost: '\u2717', city_founded: '\u2302',
+  building_completed: '\u2692', tech_researched: '\u2605',
+  government_changed: '\u2690', diplomacy_changed: '\u2694',
+  score_change: '\u2191'
+};
+
+function load(targetPlayer) {
+  var url = '/cgi-bin/dashboard-data?token=' + token;
+  if (targetPlayer) url += '&player=' + encodeURIComponent(targetPlayer);
+  fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.ok) {
+      if (d.error && d.error.indexOf('expired') >= 0) { window.location.href = '/login.html?next=/dashboard.html'; }
+      document.getElementById('content').innerHTML = '<div class="loading">' + esc(d.error || d.message || 'Error') + '</div>';
+      return;
+    }
+
+    buildNav(d);
+
+    // Admin player selector
+    if (d.is_admin && d.all_players && d.all_players.length > 0) {
+      var sel = '<label>View as:</label> <select id="player-select">';
+      d.all_players.forEach(function(p) {
+        sel += '<option value="' + esc(p) + '"' + (p === d.player ? ' selected' : '') + '>' + esc(p) + '</option>';
+      });
+      sel += '</select>';
+      document.getElementById('admin-bar').innerHTML = '<div class="admin-bar">' + sel + '</div>';
+      document.getElementById('player-select').addEventListener('change', function() { load(this.value); });
+    }
+
+    if (!d.current) {
+      document.getElementById('content').innerHTML = '<div class="loading">' + esc(d.message || 'No data yet') + '</div>';
+      return;
+    }
+
+    render(d);
+  }).catch(function(e) {
+    document.getElementById('content').innerHTML = '<div class="loading">Failed to load dashboard</div>';
+  });
+}
+
+function render(d) {
+  var c = d.current;
+  var html = '';
+
+  // Overview cards
+  var unitTotal = 0;
+  if (c.unit_types) { for (var k in c.unit_types) unitTotal += c.unit_types[k]; }
+  html += '<div class="overview">' +
+    card(c.score, 'Score') + card(c.gold, 'Gold') +
+    card(c.government, 'Government') + card(c.techs_count || (c.techs ? c.techs.length : 0), 'Techs') +
+    card(c.cities ? c.cities.length : 0, 'Cities') + card(unitTotal, 'Units') +
+    card(c.researching || '\u2014', 'Researching') + card(c.goal && c.goal !== 'A_UNSET' ? c.goal : '\u2014', 'Goal') +
+    '</div>';
+
+  // Cities
+  if (c.cities && c.cities.length) {
+    html += '<div class="section"><div class="section-title">Cities</div><table>' +
+      '<tr><th>City</th><th>Size</th><th>Building</th><th>Improvements</th></tr>';
+    c.cities.forEach(function(city) {
+      html += '<tr><td>' + esc(city.name) + '</td><td>' + city.size + '</td>' +
+        '<td class="building">' + esc(city.building || '\u2014') + '</td>' +
+        '<td class="improvements">' + (city.improvements || []).map(esc).join(', ') + '</td></tr>';
+    });
+    html += '</table></div>';
+  }
+
+  // Units
+  if (c.unit_types && Object.keys(c.unit_types).length) {
+    html += '<div class="section"><div class="section-title">Forces</div><div class="unit-grid">';
+    var types = Object.keys(c.unit_types).sort();
+    types.forEach(function(t) {
+      html += '<div class="unit-chip"><span class="count">' + c.unit_types[t] + '\u00d7</span>' + esc(t) + '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // Diplomacy
+  var knownDiplo = (c.diplomacy || []).filter(function(dd) { return dd.status !== 'War' || dd.nation !== 'Animal Kingdom'; });
+  if (knownDiplo.length) {
+    // Find when each diplomatic status last changed by scanning timeline
+    var diploSinceTurn = {};
+    (d.timeline || []).forEach(function(t) {
+      (t.events || []).forEach(function(ev) {
+        if (ev.type === 'diplomacy_changed') {
+          // Extract player name from detail like "Alliance with Peter (Florentine)" or "First contact with Peter (Florentine)"
+          var m = ev.detail.match(/with (.+?) \(/);
+          if (m) diploSinceTurn[m[1]] = t.turn;
+        }
+      });
+    });
+
+    html += '<div class="section"><div class="section-title">Diplomacy</div><table>' +
+      '<tr><th>Nation</th><th>Leader</th><th>Status</th><th>Since</th></tr>';
+    knownDiplo.forEach(function(rel) {
+      var cls = 'diplo-other';
+      if (rel.status === 'Alliance') cls = 'diplo-alliance';
+      else if (rel.status === 'Peace') cls = 'diplo-peace';
+      else if (rel.status === 'War') cls = 'diplo-war';
+      var since = diploSinceTurn[rel.player] || rel.first_contact_turn || '\u2014';
+      html += '<tr><td>' + esc(rel.nation) + '</td><td>' + esc(rel.player) + '</td>' +
+        '<td><span class="diplo-status ' + cls + '">' + esc(rel.status) + '</span></td>' +
+        '<td>Turn ' + since + '</td></tr>';
+    });
+    html += '</table></div>';
+  }
+
+  // Techs
+  if (c.techs && c.techs.length) {
+    html += '<div class="section"><div class="section-title">Known Technologies</div><div class="tech-list">';
+    if (c.researching) html += '<div class="researching-tag">' + esc(c.researching) + ' (researching)</div>';
+    c.techs.sort().forEach(function(t) {
+      html += '<div class="tech-tag">' + esc(t) + '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // Timeline
+  html += '<div class="section"><div class="section-title">Timeline</div>';
+  if (!d.timeline || !d.timeline.length) {
+    html += '<div class="no-events">No events recorded yet.</div>';
+  } else {
+    html += '<div class="timeline">';
+    // Reverse chronological, all expanded
+    var reversed = d.timeline.slice().reverse();
+    reversed.forEach(function(t) {
+      var evCount = t.events ? t.events.length : 0;
+      if (evCount === 0) return; // skip empty turns
+      html += '<div class="turn-group">' +
+        '<div class="turn-header">' +
+        '<span><span class="turn-label">Turn ' + t.turn + '</span> <span class="turn-year">\u2014 ' + esc(t.year) + '</span></span>' +
+        '<span class="event-count">' + evCount + ' event' + (evCount !== 1 ? 's' : '') + '</span>' +
+        '</div><div class="turn-events">';
+      (t.events || []).forEach(function(ev) {
+        var icon = EVENT_ICONS[ev.type] || '\u2022';
+        html += '<div class="event ev-' + ev.type + '"><span class="event-icon">' + icon + '</span><span>' + esc(ev.detail) + '</span></div>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function card(val, label) {
+  return '<div class="card"><div class="val">' + esc(String(val)) + '</div><div class="lbl">' + label + '</div></div>';
+}
+
+load();
+</script>
+</body>
+</html>

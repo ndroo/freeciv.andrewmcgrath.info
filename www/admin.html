@@ -9,17 +9,18 @@
     body { background:#1a1a1a; font-family:'Georgia','Times New Roman',serif; color:#1a1a1a; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:20px; }
     .admin-page { max-width:700px; width:100%; background:#f5f0e6; border:1px solid #d5d0c5; overflow:hidden; }
     .admin-masthead { text-align:center; padding:20px 24px 14px; border-bottom:3px double #1a1a1a; }
-    .admin-masthead h1 { font-size:24px; font-weight:900; letter-spacing:1px; }
-    .admin-masthead .sub { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:3px; margin-top:4px; }
+    .admin-masthead h1 { font-size:28px; font-weight:900; letter-spacing:1px; line-height:1; }
+    .admin-masthead .sub { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:3px; margin-top:6px; }
+    .admin-masthead .tagline { font-size:11px; color:#666; font-style:italic; margin-top:8px; min-height:16px; }
     .back-link { display:block; text-align:center; margin-top:14px; }
     .back-link a { font-size:11px; color:#537895; text-decoration:none; font-family:-apple-system,sans-serif; }
     .back-link a:hover { text-decoration:underline; }
 
     /* Login */
     .admin-login { padding:30px 24px; text-align:center; }
-    .admin-login p { font-size:13px; color:#444; margin-bottom:16px; }
+    .admin-login p { font-size:13px; color:#444; margin-bottom:16px; line-height:1.5; }
     .admin-login input { font-family:'Georgia',serif; font-size:14px; padding:10px 14px; border:1px solid #ccc; background:#fff; color:#1a1a1a; width:200px; display:block; margin:8px auto; border-radius:0; }
-    .admin-login button { font-family:'Georgia',serif; font-size:14px; padding:10px 28px; border:1px solid #1a1a1a; background:#1a1a1a; color:#f5f0e6; cursor:pointer; margin-top:8px; }
+    .admin-login button { font-family:'Georgia',serif; font-size:14px; padding:10px 28px; border:1px solid #1a1a1a; background:#1a1a1a; color:#f5f0e6; cursor:pointer; margin-top:8px; letter-spacing:1px; }
     .admin-login button:hover { background:#333; }
     .admin-error { color:#8b0000; font-size:12px; margin-top:10px; min-height:18px; }
 
@@ -49,8 +50,12 @@
 
     .admin-footer { text-align:center; padding:10px; border-top:3px double #1a1a1a; font-size:9px; color:#888; text-transform:uppercase; letter-spacing:2px; }
     .empty { font-size:13px; color:#888; text-align:center; padding:40px 20px; font-style:italic; }
-    .admin-bar { font-size:10px; color:#888; text-align:center; padding:8px; border-top:1px solid #e5e0d5; font-style:italic; }
-    .admin-bar a { color:#888; cursor:pointer; text-decoration:underline; }
+    .site-nav { display:flex; justify-content:center; align-items:center; gap:14px; padding:7px 20px; border-bottom:1px solid #d5d0c5; background:#ede8d8; font-size:11px; font-family:-apple-system,BlinkMacSystemFont,sans-serif; }
+    .site-nav a { color:#537895; text-decoration:none; } .site-nav a:hover { text-decoration:underline; }
+    .site-nav .active { font-weight:700; color:#1a1a1a; }
+    .site-nav .sep { color:#ccc; }
+    .site-nav .right { margin-left:auto; color:#888; }
+    .site-nav .right a { color:#888; }
 
     @media(max-width:560px) { .admin-page { border:none; } body { padding:0; } }
   </style>
@@ -61,11 +66,12 @@
   <div class="admin-masthead">
     <h1>The Civ Chronicle</h1>
     <div class="sub">Editor's Desk — Admin View</div>
+    <div class="tagline">All player correspondence. Handle with discretion.</div>
   </div>
+  <div id="site-nav"></div>
   <div id="admin-content"></div>
   <div class="admin-footer">Confidential — Editor's eyes only</div>
 </div>
-<div class="back-link"><a href="/">&larr; Game status</a> &middot; <a href="/editor.html" style="font-size:11px;color:#537895;text-decoration:none;font-family:-apple-system,sans-serif;">My inbox</a></div>
 
 <script>
 var token = sessionStorage.getItem('editorToken');
@@ -73,8 +79,29 @@ var player = sessionStorage.getItem('editorPlayer');
 
 function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+function buildNav() {
+  var nav = document.getElementById('site-nav');
+  if (!token) { nav.innerHTML = ''; return; }
+  nav.innerHTML = '<div class="site-nav">' +
+    '<a href="/">Game Status</a>' +
+    '<span class="sep">&middot;</span>' +
+    '<a href="/editor.html">Correspondence</a>' +
+    '<span class="sep">&middot;</span>' +
+    '<a href="/dashboard.html">Intelligence Briefing</a>' +
+    '<span class="sep">&middot;</span>' +
+    '<a href="/admin.html" class="active">Admin</a>' +
+    '<span class="right"><a href="#" id="nav-logout">Sign out (' + esc(player) + ')</a></span>' +
+    '</div>';
+  document.getElementById('nav-logout').addEventListener('click', function(e) {
+    e.preventDefault();
+    sessionStorage.removeItem('editorToken'); sessionStorage.removeItem('editorPlayer');
+    token = null; player = null;
+    window.location.href = '/login.html';
+  });
+}
+
 function init() {
-  if (token) { loadPlayerList(); } else { showLogin(); }
+  if (token) { buildNav(); loadPlayerList(); } else { window.location.href = '/login.html?next=/admin.html'; }
 }
 
 function showLogin() {
@@ -104,6 +131,7 @@ function doLogin() {
       token = d.token; player = d.player;
       sessionStorage.setItem('editorToken', d.token);
       sessionStorage.setItem('editorPlayer', d.player);
+      buildNav();
       loadPlayerList();
     } else { err.textContent = d.error || 'Login failed'; }
   }).catch(function() { err.textContent = 'Connection error'; });
@@ -116,16 +144,13 @@ function loadPlayerList() {
     if (!d.ok) {
       if (d.error && d.error.indexOf('admin') >= 0) {
         document.getElementById('admin-content').innerHTML =
-          '<div class="empty">Access denied. Your account is not an admin.</div>' +
-          '<div class="admin-bar"><a id="logout-link">Sign out</a></div>';
-        document.getElementById('logout-link').addEventListener('click', doLogout);
+          '<div class="empty">Access denied. Your account is not an admin.</div>';
       } else {
-        token = null; sessionStorage.removeItem('editorToken'); showLogin();
+        token = null; sessionStorage.removeItem('editorToken'); window.location.href = '/login.html?next=/admin.html';
       }
       return;
     }
-    var html = '<div class="admin-bar">Signed in as ' + esc(player) + ' &middot; <a id="logout-link">Sign out</a></div>';
-    html += '<div class="player-list">';
+    var html = '<div class="player-list">';
     if (!d.players || !d.players.length) {
       html += '<div class="empty">No conversations yet.</div>';
     } else {
@@ -140,11 +165,10 @@ function loadPlayerList() {
     }
     html += '</div>';
     document.getElementById('admin-content').innerHTML = html;
-    document.getElementById('logout-link').addEventListener('click', doLogout);
     document.querySelectorAll('.player-item').forEach(function(el) {
       el.addEventListener('click', function() { loadConversation(el.dataset.player); });
     });
-  }).catch(function() { token = null; showLogin(); });
+  }).catch(function() { token = null; window.location.href = '/login.html?next=/admin.html'; });
 }
 
 function loadConversation(playerName) {
@@ -188,13 +212,6 @@ function loadConversation(playerName) {
       if (container) container.scrollTop = container.scrollHeight;
     }
   });
-}
-
-function doLogout() {
-  sessionStorage.removeItem('editorToken');
-  sessionStorage.removeItem('editorPlayer');
-  token = null; player = null;
-  showLogin();
 }
 
 init();

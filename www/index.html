@@ -325,7 +325,7 @@
   function renderNav(d) {
     var links = document.getElementById('nav-links');
     links.innerHTML = d.game.turn > 0
-      ? '<a href="#gazette">Chronicle</a><a href="#rankings">Rankings</a><a href="#history">History</a><a href="#connect">Connect</a>'
+      ? '<a href="#gazette">Chronicle</a><a href="#rankings">Rankings</a><a href="#history">History</a><a href="#connect">Connect</a><a href="/login.html">Player Login</a>'
       : '<a href="#connect">Connect</a><a href="#rules">Rules</a><a href="/changelog.html">Changelog</a>';
     var on = d.game.server_status === 'Online';
     document.getElementById('status-pill').innerHTML =

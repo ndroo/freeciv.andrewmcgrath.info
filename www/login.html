@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Player Login — The Civ Chronicle</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#1a1a1a; font-family:'Georgia','Times New Roman',serif; color:#1a1a1a; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:20px; }
+    .login-page { max-width:520px; width:100%; background:#f5f0e6; border:1px solid #d5d0c5; overflow:hidden; }
+    .login-masthead { text-align:center; padding:20px 24px 14px; border-bottom:3px double #1a1a1a; }
+    .login-masthead h1 { font-size:28px; font-weight:900; letter-spacing:1px; line-height:1; }
+    .login-masthead .sub { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:3px; margin-top:6px; }
+    .login-masthead .tagline { font-size:11px; color:#666; font-style:italic; margin-top:8px; min-height:16px; }
+    .login-form { padding:30px 24px; text-align:center; }
+    .login-form p { font-size:13px; color:#444; margin-bottom:16px; line-height:1.5; }
+    .login-form input { font-family:'Georgia',serif; font-size:14px; padding:10px 14px; border:1px solid #ccc; background:#fff; color:#1a1a1a; width:200px; display:block; margin:8px auto; border-radius:0; }
+    .login-form button { font-family:'Georgia',serif; font-size:14px; padding:10px 28px; border:1px solid #1a1a1a; background:#1a1a1a; color:#f5f0e6; cursor:pointer; margin-top:8px; letter-spacing:1px; }
+    .login-form button:hover { background:#333; }
+    .login-error { color:#8b0000; font-size:12px; margin-top:10px; min-height:18px; }
+    .login-footer { text-align:center; padding:10px; border-top:3px double #1a1a1a; font-size:9px; color:#888; text-transform:uppercase; letter-spacing:2px; }
+    .back-link { display:block; text-align:center; margin-top:14px; }
+    .back-link a { font-size:11px; color:#537895; text-decoration:none; font-family:-apple-system,sans-serif; }
+    .back-link a:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<div class="login-page">
+  <div class="login-masthead">
+    <h1>The Civ Chronicle</h1>
+    <div class="sub">Player Login</div>
+    <div class="tagline">Sign in to access your intelligence briefing and correspondence.</div>
+  </div>
+  <div class="login-form">
+    <p>Sign in with your Freeciv game credentials.</p>
+    <input type="text" id="login-user" placeholder="Username" autocapitalize="none" autocorrect="off">
+    <input type="password" id="login-pass" placeholder="Password">
+    <button id="login-btn">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+  <div class="login-footer">All the civilization that's fit to print</div>
+</div>
+<div class="back-link"><a href="/">&larr; Back to game status</a></div>
+
+<script>
+// If already logged in, redirect to destination
+var token = sessionStorage.getItem('editorToken');
+if (token) {
+  var dest = new URLSearchParams(window.location.search).get('next') || '/dashboard.html';
+  window.location.href = dest;
+}
+
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('login-pass').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-user').focus();
+
+function doLogin() {
+  var user = document.getElementById('login-user').value.trim();
+  var pass = document.getElementById('login-pass').value;
+  var err = document.getElementById('login-error');
+  if (!user || !pass) { err.textContent = 'Enter username and password'; return; }
+  err.textContent = 'Signing in...';
+  fetch('/cgi-bin/editor-login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username: user, password: pass})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      sessionStorage.setItem('editorToken', d.token);
+      sessionStorage.setItem('editorPlayer', d.player);
+      var dest = new URLSearchParams(window.location.search).get('next') || '/dashboard.html';
+      window.location.href = dest;
+    } else { err.textContent = d.error || 'Login failed'; }
+  }).catch(function() { err.textContent = 'Connection error'; });
+}
+</script>
+</body>
+</html>

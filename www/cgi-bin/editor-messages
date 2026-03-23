@@ -45,6 +45,11 @@ fi
 # --- fetch messages ---
 # PLAYER comes from DB (trusted), not user input
 # sqlite3 -json handles escaping, pipe through jq -c to compact (removes literal newlines)
+# Update last_seen so dashboard can show unread count
+sqlite3 "$DB_PATH" "UPDATE editor_sessions SET last_seen=$NOW WHERE token='$TOKEN';" 2>/dev/null
+# Add last_seen column if it doesn't exist (idempotent)
+sqlite3 "$DB_PATH" "ALTER TABLE editor_sessions ADD COLUMN last_seen INTEGER DEFAULT 0;" 2>/dev/null || true
+
 MESSAGES=$(sqlite3 -json "$DB_PATH" "SELECT role, content, created_at FROM editor_messages WHERE LOWER(player_name)=LOWER('$PLAYER') ORDER BY created_at ASC LIMIT 100;" 2>/dev/null | jq -c '.')
 [ -z "$MESSAGES" ] && MESSAGES="[]"
 

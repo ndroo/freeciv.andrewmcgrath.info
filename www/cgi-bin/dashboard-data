@@ -1,0 +1,91 @@
+#!/bin/sh
+# CGI endpoint: GET /cgi-bin/dashboard-data?token=...&player=... (admin only)
+# Returns personal dashboard JSON for the authenticated player
+# Admins can pass ?player=NAME to view another player's dashboard
+
+DB_PATH="${DB_PATH:-/data/saves/freeciv.sqlite}"
+DASHBOARD_DIR="${DASHBOARD_DIR:-/data/saves/dashboard}"
+ADMIN_FILE="/data/saves/editor_admins"
+NOW=$(date +%s)
+
+# --- helpers ---
+json_error() {
+  echo "Status: ${2:-400} Bad Request"
+  echo "Content-Type: application/json"
+  echo "Access-Control-Allow-Origin: *"
+  echo ""
+  echo "{\"ok\":false,\"error\":\"$1\"}"
+  exit 0
+}
+
+# Handle CORS preflight
+if [ "$REQUEST_METHOD" = "OPTIONS" ]; then
+  echo "Status: 200 OK"
+  echo "Access-Control-Allow-Origin: *"
+  echo "Access-Control-Allow-Methods: GET, OPTIONS"
+  echo "Access-Control-Allow-Headers: Content-Type"
+  echo ""
+  exit 0
+fi
+
+# --- extract and validate token ---
+TOKEN=$(echo "$QUERY_STRING" | sed -n 's/.*token=\([a-f0-9]*\).*/\1/p' | head -c 64)
+if [ -z "$TOKEN" ] || ! echo "$TOKEN" | grep -qE '^[a-f0-9]{60,64}$'; then
+  json_error "Invalid or missing token" "401 Unauthorized"
+fi
+
+# --- look up session ---
+PLAYER=$(sqlite3 "$DB_PATH" "SELECT player_name FROM editor_sessions WHERE token='$TOKEN' AND expires_at > $NOW;" 2>/dev/null)
+[ -z "$PLAYER" ] && json_error "Session expired or invalid" "401 Unauthorized"
+
+# --- check for admin viewing another player ---
+TARGET_PLAYER="$PLAYER"
+REQUESTED=$(echo "$QUERY_STRING" | sed -n 's/.*player=\([a-zA-Z0-9_-]*\).*/\1/p')
+if [ -n "$REQUESTED" ] && [ "$(echo "$REQUESTED" | tr '[:upper:]' '[:lower:]')" != "$(echo "$PLAYER" | tr '[:upper:]' '[:lower:]')" ]; then
+  # Must be admin
+  IS_ADMIN=0
+  [ -f "$ADMIN_FILE" ] && IS_ADMIN=$(grep -ixc "$PLAYER" "$ADMIN_FILE" 2>/dev/null || echo 0)
+  if [ "$IS_ADMIN" -gt 0 ]; then
+    TARGET_PLAYER=$(echo "$REQUESTED" | tr '[:upper:]' '[:lower:]')
+  else
+    json_error "Admin access required to view other players" "403 Forbidden"
+  fi
+fi
+
+# --- normalize to lowercase ---
+TARGET_LOWER=$(echo "$TARGET_PLAYER" | tr '[:upper:]' '[:lower:]')
+
+# --- check for admin status (for player list) ---
+IS_ADMIN=0
+[ -f "$ADMIN_FILE" ] && IS_ADMIN=$(grep -ixc "$PLAYER" "$ADMIN_FILE" 2>/dev/null || echo 0)
+
+# --- get list of all available players (admin only) ---
+ALL_PLAYERS="[]"
+if [ "$IS_ADMIN" -gt 0 ] && [ -d "$DASHBOARD_DIR" ]; then
+  ALL_PLAYERS=$(ls "$DASHBOARD_DIR"/*.json 2>/dev/null | sed 's|.*/||;s|\.json$||' | jq -R -s 'split("\n") | map(select(length > 0))')
+fi
+
+# --- count unread editor messages ---
+UNREAD=0
+LAST_SEEN=$(sqlite3 "$DB_PATH" "SELECT MAX(last_seen) FROM editor_sessions WHERE LOWER(player_name)=LOWER('$TARGET_LOWER');" 2>/dev/null || echo 0)
+[ -z "$LAST_SEEN" ] && LAST_SEEN=0
+UNREAD=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM editor_messages WHERE LOWER(player_name)=LOWER('$TARGET_LOWER') AND role='editor' AND created_at > $LAST_SEEN;" 2>/dev/null || echo 0)
+[ -z "$UNREAD" ] && UNREAD=0
+
+# --- read dashboard file ---
+DASHBOARD_FILE="$DASHBOARD_DIR/${TARGET_LOWER}.json"
+
+echo "Status: 200 OK"
+echo "Content-Type: application/json"
+echo "Access-Control-Allow-Origin: *"
+echo ""
+
+if [ -f "$DASHBOARD_FILE" ]; then
+  # Wrap the dashboard data with metadata
+  jq -c --arg player "$TARGET_LOWER" --argjson unread "$UNREAD" --argjson is_admin "$IS_ADMIN" --argjson all_players "$ALL_PLAYERS" \
+    '. + {ok: true, player: $player, editor_unread: $unread, is_admin: ($is_admin > 0), all_players: $all_players}' \
+    "$DASHBOARD_FILE"
+else
+  printf '{"ok":true,"player":"%s","data":null,"editor_unread":%s,"is_admin":%s,"all_players":%s,"message":"Dashboard data is being generated..."}\n' \
+    "$TARGET_LOWER" "$UNREAD" "$([ "$IS_ADMIN" -gt 0 ] && echo true || echo false)" "$ALL_PLAYERS"
+fi
