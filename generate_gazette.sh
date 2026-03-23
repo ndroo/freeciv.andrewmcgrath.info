@@ -292,6 +292,7 @@ BE CONCISE. Each section should be 1-2 short paragraphs, not feature-length arti
 - **PUBLIC** (report freely): diplomacy, wars, alliances, government types, aggregate totals, wonder completions, combat casualties, city foundings, rankings, nations, spaceship progress, who holds wonders, government changes, trends
 - **PRIVATE** (never reveal): per-player gold, per-player unit counts or compositions, per-player tech counts, research targets, city production, per-player happiness/literacy/pollution
 - Fictional quotes from in-game player leaders are encouraged — they are public figures being quoted by the press. But use them where they serve the story, not as a formula. Some stories need quotes; some are better without them.
+- **Player-nation cross-referencing**: On first mention of a player in each section, naturally include their nation (e.g. "Shogun of the English", "Kroony, the Atlantean chieftain"). On first mention of a nation, include the player name (e.g. "the English, led by Shogun"). Do this naturally within the prose — do NOT use parenthetical annotations like "Shogun (English)". After the first mention in a section, just use whichever name fits.
 
 ## Structure
 
