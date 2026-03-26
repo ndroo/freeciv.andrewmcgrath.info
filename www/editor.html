@@ -32,6 +32,7 @@
     .editor-msg-editor { margin-right:auto; }
     .editor-msg-label { font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#888; margin-bottom:3px; }
     .editor-msg-bubble { font-size:13px; line-height:1.6; padding:10px 14px; border-radius:2px; }
+    .editor-msg-bubble p + p { margin-top:8px; }
     .editor-msg-player .editor-msg-bubble { background:#ede8d8; border:1px solid #d5d0c5; }
     .editor-msg-editor .editor-msg-bubble { background:#fff; border:1px solid #ccc; font-style:italic; }
     .editor-msg-time { font-size:9px; color:#aaa; margin-top:3px; }
@@ -221,11 +222,13 @@ function loadMessages() {
     if (d.messages) {
       var bubbles = list.querySelectorAll('.editor-msg-bubble');
       d.messages.forEach(function(m, i) {
-        if (m.role === 'player') { bubbles[i].textContent = m.content; }
+        var escaped = esc(m.content);
+        if (m.role === 'player') {
+          bubbles[i].innerHTML = '<p>' + escaped.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+        }
         else {
           // Convert markdown to HTML for editor messages
-          var html = m.content
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')  // escape HTML first
+          var html = escaped
             .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')  // **bold**
             .replace(/\*([^*]+)\*/g, '<em>$1</em>')  // *italic*
             .replace(/\n\n/g, '</p><p>')  // double newline = paragraph
