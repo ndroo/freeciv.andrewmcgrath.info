@@ -33,6 +33,7 @@
     .editor-msg-label { font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#888; margin-bottom:3px; }
     .editor-msg-bubble { font-size:13px; line-height:1.6; padding:10px 14px; border-radius:2px; }
     .editor-msg-bubble p + p { margin-top:8px; }
+    .editor-msg-bubble code { font-family:monospace; font-size:12px; background:#e8e2d0; padding:1px 4px; border-radius:2px; font-style:normal; }
     .editor-msg-player .editor-msg-bubble { background:#ede8d8; border:1px solid #d5d0c5; }
     .editor-msg-editor .editor-msg-bubble { background:#fff; border:1px solid #ccc; font-style:italic; }
     .editor-msg-time { font-size:9px; color:#aaa; margin-top:3px; }
@@ -223,18 +224,13 @@ function loadMessages() {
       var bubbles = list.querySelectorAll('.editor-msg-bubble');
       d.messages.forEach(function(m, i) {
         var escaped = esc(m.content);
-        if (m.role === 'player') {
-          bubbles[i].innerHTML = '<p>' + escaped.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
-        }
-        else {
-          // Convert markdown to HTML for editor messages
-          var html = escaped
-            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')  // **bold**
-            .replace(/\*([^*]+)\*/g, '<em>$1</em>')  // *italic*
-            .replace(/\n\n/g, '</p><p>')  // double newline = paragraph
-            .replace(/\n/g, '<br>');  // single newline = line break
-          bubbles[i].innerHTML = '<p>' + html + '</p>';
-        }
+        var html = escaped
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>')
+          .replace(/\n\n/g, '</p><p>')
+          .replace(/\n/g, '<br>');
+        bubbles[i].innerHTML = '<p>' + html + '</p>';
       });
     }
     list.scrollTop = list.scrollHeight;
