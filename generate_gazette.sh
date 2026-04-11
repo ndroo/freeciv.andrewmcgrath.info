@@ -122,15 +122,25 @@ build_turn_context() {
   local recent_history
   recent_history=$(echo "$history" | jq --argjson t "$target_turn" '[.[] | select(.turn > ($t - 5))]')
 
+  # Write data to temp files to avoid ARG_MAX limits on jq command line
+  local _tmpdir=$(mktemp -d)
+  echo "$submissions" > "$_tmpdir/subs.json"
+  echo "$current_entry" > "$_tmpdir/curr.json"
+  echo "${prev_entry:-null}" > "$_tmpdir/prev.json"
+  echo "$diplomacy" | jq --argjson t "$target_turn" '[.events[] | select(.turn == $t)]' > "$_tmpdir/dipl_events.json"
+  echo "$diplomacy" | jq '.current // []' > "$_tmpdir/all_dipl.json"
+  echo "$recent_history" > "$_tmpdir/hist.json"
+
   local context
   context=$(jq -n \
-    --argjson player_subs "$submissions" \
-    --argjson curr "$current_entry" \
-    --argjson prev "${prev_entry:-null}" \
-    --argjson dipl_events "$(echo "$diplomacy" | jq --argjson t "$target_turn" '[.events[] | select(.turn == $t)]')" \
-    --argjson all_dipl "$(echo "$diplomacy" | jq '.current // []')" \
-    --argjson all_history "$recent_history" \
-    '{
+    --slurpfile player_subs "$_tmpdir/subs.json" \
+    --slurpfile curr "$_tmpdir/curr.json" \
+    --slurpfile prev "$_tmpdir/prev.json" \
+    --slurpfile dipl_events "$_tmpdir/dipl_events.json" \
+    --slurpfile all_dipl "$_tmpdir/all_dipl.json" \
+    --slurpfile all_history "$_tmpdir/hist.json" \
+    '$player_subs[0] as $player_subs | $curr[0] as $curr | $prev[0] as $prev | $dipl_events[0] as $dipl_events | $all_dipl[0] as $all_dipl | $all_history[0] as $all_history |
+    {
       turn: $curr.turn,
       year: $curr.year,
       year_display: (if $curr.year < 0 then "\(-$curr.year) BC" else "\($curr.year) AD" end),
@@ -241,6 +251,7 @@ build_turn_context() {
       player_submissions: $player_subs
     }')
 
+  rm -rf "$_tmpdir"
   echo "$context"
 }
 
@@ -376,9 +387,12 @@ ${prev_issue}"
   local request_body response content
 
   if [ "$GAZETTE_PROVIDER" = "anthropic" ]; then
+    local _tmpsys=$(mktemp) _tmpusr=$(mktemp)
+    printf '%s' "$system_prompt" > "$_tmpsys"
+    printf '%s' "$user_prompt" > "$_tmpusr"
     request_body=$(jq -n \
-      --arg system "$system_prompt" \
-      --arg user "$user_prompt" \
+      --rawfile system "$_tmpsys" \
+      --rawfile user "$_tmpusr" \
       '{
         model: "claude-opus-4-6",
         max_tokens: 8000,
@@ -388,13 +402,17 @@ ${prev_issue}"
         ],
         temperature: 0.9
       }')
+    rm -f "$_tmpsys" "$_tmpusr"
 
+    local _tmpbody=$(mktemp)
+    echo "$request_body" > "$_tmpbody"
     response=$(curl -s --max-time 120 \
       -H "x-api-key: $ANTHROPIC_API_KEY" \
       -H "anthropic-version: 2023-06-01" \
       -H "Content-Type: application/json" \
-      -d "$request_body" \
+      -d "@$_tmpbody" \
       "https://api.anthropic.com/v1/messages")
+    rm -f "$_tmpbody"
 
     content=$(echo "$response" | jq -r '.content[0].text // empty')
 
@@ -407,9 +425,12 @@ ${prev_issue}"
     # Claude may wrap JSON in markdown code fences — strip them
     content=$(echo "$content" | sed '/^```json$/d' | sed '/^```$/d')
   else
+    local _tmpsys=$(mktemp) _tmpusr=$(mktemp)
+    printf '%s' "$system_prompt" > "$_tmpsys"
+    printf '%s' "$user_prompt" > "$_tmpusr"
     request_body=$(jq -n \
-      --arg system "$system_prompt" \
-      --arg user "$user_prompt" \
+      --rawfile system "$_tmpsys" \
+      --rawfile user "$_tmpusr" \
       '{
         model: "gpt-5.4",
         messages: [
@@ -420,12 +441,16 @@ ${prev_issue}"
         max_completion_tokens: 8000,
         response_format: {type: "json_object"}
       }')
+    rm -f "$_tmpsys" "$_tmpusr"
 
+    local _tmpbody=$(mktemp)
+    echo "$request_body" > "$_tmpbody"
     response=$(curl -s --max-time 60 \
       -H "Authorization: Bearer $OPENAI_API_KEY" \
       -H "Content-Type: application/json" \
-      -d "$request_body" \
+      -d "@$_tmpbody" \
       "https://api.openai.com/v1/chat/completions")
+    rm -f "$_tmpbody"
 
     content=$(echo "$response" | jq -r '.choices[0].message.content // empty')
 
@@ -593,10 +618,12 @@ process_turn() {
   # Remove existing entry for this turn if rebuilding
   GAZETTE_JSON=$(echo "$GAZETTE_JSON" | jq --argjson t "$target_turn" '[.[] | select(.turn != $t)]')
 
-  # Add new entry
+  # Add new entry (write entry to temp file to avoid ARG_MAX)
+  local _tmpentry=$(mktemp)
+  echo "$entry" > "$_tmpentry"
   GAZETTE_JSON=$(echo "$GAZETTE_JSON" | jq --argjson t "$target_turn" --argjson y "$year" \
-    --arg yd "$year_display" --argjson entry "$entry" --arg img "$illustration" \
-    '. + [{
+    --arg yd "$year_display" --slurpfile entry "$_tmpentry" --arg img "$illustration" \
+    '$entry[0] as $entry | . + [{
       turn: $t,
       year: $y,
       year_display: $yd,
@@ -609,6 +636,7 @@ process_turn() {
       illustration: (if $img != "" then $img else null end),
       illustration_caption: ($entry.illustration_caption // null)
     }] | sort_by(.turn)')
+  rm -f "$_tmpentry"
 
   # Save after each entry
   echo "$GAZETTE_JSON" > "$GAZETTE_FILE.tmp"

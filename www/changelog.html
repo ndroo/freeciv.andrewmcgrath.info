@@ -64,6 +64,15 @@
   <p class="subtitle">Server updates, fixes, and new features.</p>
 
   <div class="entry">
+    <div class="entry-date">April 11, 2026</div>
+    <div class="entry-title">Fix Gazette Generation for Large Games</div>
+    <ul>
+      <li>Fixed a bug where the Civ Chronicle gazette failed to generate when game data grew too large for shell command-line argument limits</li>
+      <li>Gazette data and API request bodies now use temp files instead of inline arguments, preventing ARG_MAX overflows</li>
+    </ul>
+  </div>
+
+  <div class="entry">
     <div class="entry-date">March 26, 2026</div>
     <div class="entry-title">Editor Chat Line Breaks</div>
     <ul>
