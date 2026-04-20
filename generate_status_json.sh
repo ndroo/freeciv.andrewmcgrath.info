@@ -45,11 +45,13 @@ ATTENDANCE_FILE="$SAVE_DIR/attendance.json"
 NO_LIVE=false
 REBUILD_HISTORY=false
 REBUILD_ATTENDANCE=false
+REBUILD_TURN=""
 for arg in "$@"; do
   case "$arg" in
     --no-live) NO_LIVE=true ;;
     --rebuild-history) REBUILD_HISTORY=true ;;
     --rebuild-attendance) REBUILD_ATTENDANCE=true ;;
+    --rebuild-turn=*) REBUILD_TURN="${arg#--rebuild-turn=}" ;;
   esac
 done
 
@@ -74,16 +76,21 @@ make_tmp() {
 # ---------------------------------------------------------------------------
 decompress_save() {
   local save_path="$1"
-  local tmp
+  local tmp rc
   tmp=$(make_tmp)
   case "$save_path" in
-    *.xz)  xz -dc "$save_path" > "$tmp" 2>/dev/null ;;
-    *.bz2) bzip2 -dc "$save_path" > "$tmp" 2>/dev/null ;;
-    *.gz)  gzip -dc "$save_path" > "$tmp" 2>/dev/null ;;
-    *.zst) zstd -dc "$save_path" > "$tmp" 2>/dev/null ;;
-    *)     cp "$save_path" "$tmp" ;;
+    *.xz)  xz -dc "$save_path" > "$tmp" 2>/dev/null; rc=$? ;;
+    *.bz2) bzip2 -dc "$save_path" > "$tmp" 2>/dev/null; rc=$? ;;
+    *.gz)  gzip -dc "$save_path" > "$tmp" 2>/dev/null; rc=$? ;;
+    *.zst) zstd -dc "$save_path" > "$tmp" 2>/dev/null; rc=$? ;;
+    *)     cp "$save_path" "$tmp"; rc=$? ;;
   esac
-  if [ -s "$tmp" ]; then
+  # Require clean decompression AND a [game] section followed by a non-zero
+  # player count — a truncated save can decode partially but lack trailing
+  # sections, which would produce a bogus history entry.
+  if [ "$rc" -eq 0 ] && [ -s "$tmp" ] \
+     && grep -q '^\[game\]' "$tmp" \
+     && [ "$(grep -c '^\[player[0-9]' "$tmp" 2>/dev/null || echo 0)" -gt 0 ]; then
     echo "$tmp"
   else
     return 1
@@ -265,6 +272,43 @@ extract_public_events() {
 
   echo "$events"
 }
+
+# ---------------------------------------------------------------------------
+# --rebuild-turn=N: rebuild history.json entry for a single turn from its
+# save file. Used by generate_gazette.sh to repair corrupt entries (e.g. from
+# a partial-save read). Exits after rebuilding, does NOT touch status.json.
+# ---------------------------------------------------------------------------
+if [ -n "$REBUILD_TURN" ]; then
+  TURN_SAVE=$(ls -1 "$SAVE_DIR"/lt-game-"${REBUILD_TURN}".sav.* 2>/dev/null | head -1)
+  if [ -z "$TURN_SAVE" ] || [ ! -f "$TURN_SAVE" ]; then
+    echo "[status-json] --rebuild-turn=$REBUILD_TURN: save file not found"
+    exit 1
+  fi
+  RT_TMP=$(decompress_save "$TURN_SAVE") || {
+    echo "[status-json] --rebuild-turn=$REBUILD_TURN: failed to decompress $TURN_SAVE (may be truncated)"
+    exit 1
+  }
+  RT_ENTRY=$(build_history_entry "$RT_TMP")
+  RT_PUB=$(extract_public_events "$RT_TMP")
+  RT_ENTRY=$(echo "$RT_ENTRY" | jq --argjson ev "$RT_PUB" '. + {public_events: $ev}')
+  rm -f "$RT_TMP"
+  RT_NPLAYERS=$(echo "$RT_ENTRY" | jq '.players | length')
+  if [ "$RT_NPLAYERS" -lt 1 ] 2>/dev/null; then
+    echo "[status-json] --rebuild-turn=$REBUILD_TURN: rebuilt entry has no players, refusing to write"
+    exit 1
+  fi
+  if [ -f "$HISTORY_FILE" ] && jq . "$HISTORY_FILE" >/dev/null 2>&1; then
+    RT_HIST=$(cat "$HISTORY_FILE")
+  else
+    RT_HIST="[]"
+  fi
+  RT_HIST=$(echo "$RT_HIST" | jq --argjson t "$REBUILD_TURN" --argjson e "$RT_ENTRY" \
+    '[.[] | select(.turn != $t)] + [$e] | sort_by(.turn)')
+  echo "$RT_HIST" > "$HISTORY_FILE.tmp"
+  mv "$HISTORY_FILE.tmp" "$HISTORY_FILE"
+  echo "[status-json] --rebuild-turn=$REBUILD_TURN: wrote entry with $RT_NPLAYERS players"
+  exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Find all save files sorted by turn number (one per turn, latest file wins)
@@ -895,7 +939,7 @@ TOTAL_RANKED=0
 
 if [ -n "${LATEST_TMPFILE:-}" ] && [ -s "$LATEST_TMPFILE" ]; then
   NUM_PLAYERS=$(grep -c '^\[player[0-9]' "$LATEST_TMPFILE" 2>/dev/null || echo 0)
-  declare -a P_NAMES P_NATIONS P_GOLD P_GOV P_NCITIES P_NUNITS P_SCORES P_IS_ALIVE P_IDLE_TURNS
+  declare -a P_NAMES P_NATIONS P_GOLD P_GOV P_NCITIES P_NUNITS P_SCORES P_IS_ALIVE
 
   for i in $(seq 0 $((NUM_PLAYERS - 1))); do
     SECTION=$(sed -n "/^\[player${i}\]/,/^\[/p" "$LATEST_TMPFILE" | head -150)
@@ -906,7 +950,6 @@ if [ -n "${LATEST_TMPFILE:-}" ] && [ -s "$LATEST_TMPFILE" ]; then
     P_NUNITS[$i]=$(echo "$SECTION" | grep '^nunits=' | head -1 | sed 's/nunits=//')
     P_GOV[$i]=$(echo "$SECTION" | grep '^government_name=' | head -1 | sed 's/government_name="//' | sed 's/"//')
     P_IS_ALIVE[$i]=$(echo "$SECTION" | grep '^is_alive=' | head -1 | sed 's/is_alive=//')
-    P_IDLE_TURNS[$i]=$(echo "$SECTION" | grep '^idle_turns=' | head -1 | sed 's/idle_turns=//')
 
     SCORE_SECTION=$(sed -n "/^\[score${i}\]/,/^\[/p" "$LATEST_TMPFILE" | head -30)
     P_SCORES[$i]=$(echo "$SCORE_SECTION" | grep '^total=' | head -1 | sed 's/total=//')
@@ -923,16 +966,6 @@ if [ -n "${LATEST_TMPFILE:-}" ] && [ -s "$LATEST_TMPFILE" ]; then
     SORTED="${SORTED}${P_SCORES[$i]:-0}|${i}\n"
   done
   SORTED_INDICES=$(echo -e "$SORTED" | sort -t'|' -k1 -rn | grep -v '^$')
-
-  # Load last-seen data
-  LAST_SEEN_FILE="$SAVE_DIR/last_seen.txt"
-  unset LAST_SEEN_MAP
-  declare -A LAST_SEEN_MAP
-  if [ -f "$LAST_SEEN_FILE" ]; then
-    while IFS=: read -r ls_name ls_epoch; do
-      [ -n "$ls_name" ] && LAST_SEEN_MAP["$ls_name"]="$ls_epoch"
-    done < "$LAST_SEEN_FILE"
-  fi
 
   # Build players JSON array (sorted by score desc)
   RANK=1
@@ -977,22 +1010,6 @@ if [ -n "${LATEST_TMPFILE:-}" ] && [ -s "$LATEST_TMPFILE" ]; then
       LOGGEDIN_COUNT=$((LOGGEDIN_COUNT + 1))
     fi
 
-    # Last seen epoch (null if not found)
-    ls_epoch="${LAST_SEEN_MAP[$p_lower]:-}"
-    if [ -n "$ls_epoch" ]; then
-      last_seen_json="$ls_epoch"
-    else
-      last_seen_json="null"
-    fi
-
-    # Idle turn streak from save file (don't count current in-progress turn)
-    idle_streak="${P_IDLE_TURNS[$idx]:-0}"
-    [ -z "$idle_streak" ] && idle_streak=0
-    # If they've connected this turn, they're not idle regardless of save value
-    if [ "$phase_done_json" = "true" ] || [ "$is_connected_json" = "true" ] || [ "$connected_this_turn_json" = "true" ]; then
-      idle_streak=0
-    fi
-
     # Attendance data from attendance.json
     att_missed=$(echo "${ATTENDANCE_JSON:-{\}}" | jq --arg n "$name" '.[$n].missed_turns // 0')
     att_total=$(echo "${ATTENDANCE_JSON:-{\}}" | jq --arg n "$name" '.[$n].total_turns // 0')
@@ -1010,8 +1027,6 @@ if [ -n "${LATEST_TMPFILE:-}" ] && [ -s "$LATEST_TMPFILE" ]; then
       --argjson phase_done "$phase_done_json" \
       --argjson is_connected "$is_connected_json" \
       --argjson connected_this_turn "$connected_this_turn_json" \
-      --argjson last_seen_epoch "$last_seen_json" \
-      --argjson idle_turn_streak "$idle_streak" \
       --argjson missed_turns "$att_missed" \
       --argjson total_turns "$att_total" \
       '{
@@ -1027,8 +1042,6 @@ if [ -n "${LATEST_TMPFILE:-}" ] && [ -s "$LATEST_TMPFILE" ]; then
         phase_done: $phase_done,
         is_connected: $is_connected,
         connected_this_turn: $connected_this_turn,
-        last_seen_epoch: $last_seen_epoch,
-        idle_turn_streak: $idle_turn_streak,
         missed_turns: $missed_turns,
         total_turns: $total_turns
       }')

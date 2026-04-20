@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Freeciv Longturn</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     :root {
       --bg: #0a0d14; --surface: #111621; --surface-2: #171d2b; --surface-3: #1e2538;
@@ -92,11 +94,12 @@
     .st-online { color:var(--blue); animation:pulse 2s infinite; display:inline-block; }
     .st-seen { color:var(--purple); }
     .st-none { color:var(--text-dim); opacity:0.3; }
-    .lastseen { color:var(--text-dim); font-size:11px; white-space:nowrap; }
     .miss-high { color:var(--accent)!important; font-weight:700; }
     .miss-med { color:var(--amber)!important; }
     .miss-low { color:var(--green)!important; }
-    .idle-col { color:var(--text-dim); }
+    .delta { font-size:10px; font-weight:600; margin-left:4px; letter-spacing:-0.3px; }
+    .delta-up { color:var(--green); }
+    .delta-down { color:var(--accent); }
     .dipl-rel { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; font-size:13px; }
     .dipl-status { font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; padding:3px 10px; border-radius:4px; white-space:nowrap; }
     .dipl-war { color:var(--accent); background:var(--accent-dim); }
@@ -396,24 +399,46 @@
     var sec = document.getElementById('rankings-section');
     if (d.game.turn === 0) { sec.innerHTML = ''; return; }
     var a = d.activity;
+
+    // Diff against the previous turn's on-disk snapshot so deltas stay stable
+    // during the in-progress turn (the latest history entry is the CURRENT
+    // turn's start, so the one before is where "last turn" began).
+    var prevByName = {};
+    if (d.history && d.history.length >= 2) {
+      var prev = d.history[d.history.length - 2];
+      if (prev && prev.players) {
+        Object.keys(prev.players).forEach(function(k) {
+          prevByName[k.toLowerCase()] = prev.players[k];
+        });
+      }
+    }
+    function deltaHtml(current, prior) {
+      if (prior == null || current == null) return '';
+      var diff = current - prior;
+      if (!diff) return '';
+      var cls = diff > 0 ? 'delta-up' : 'delta-down';
+      var sign = diff > 0 ? '+' : '\u2212';
+      return '<span class="delta ' + cls + '">' + sign + Math.abs(diff) + '</span>';
+    }
+
     var rows = '';
     d.players.forEach(function(p) {
-      var idleStr = (p.idle_turn_streak != null && p.idle_turn_streak > 0) ? String(p.idle_turn_streak) : '-';
+      var prior = prevByName[p.name.toLowerCase()] || {};
       rows += '<tr class="' + (p.rank === 1 ? 'rank-1' : '') + '">' +
         '<td class="rank-col">' + rankEmoji(p.rank) + '</td>' +
         '<td class="status-col">' + statusHtml(p) + '</td>' +
         '<td><strong>' + esc(p.name) + '</strong>' + (p.is_alive ? '' : ' \u{1F480}') + '<div class="sub">' + esc(p.nation) + '</div></td>' +
-        '<td class="num ' + scoreClass(p.rank) + '">' + p.score + '</td>' +
-        '<td class="num">' + p.cities + '</td><td class="num">' + p.units + '</td>' +
-        '<td class="num gold">' + p.gold + '</td><td class="gov">' + esc(p.government) + '</td>' +
-        '<td class="num ' + missedClass(p) + '">' + missedPct(p) + '</td>' +
-        '<td class="num idle-col">' + idleStr + '</td>' +
-        '<td class="lastseen">' + timeAgo(p.last_seen_epoch) + '</td></tr>';
+        '<td class="num ' + scoreClass(p.rank) + '">' + p.score + deltaHtml(p.score, prior.score) + '</td>' +
+        '<td class="num">' + p.cities + deltaHtml(p.cities, prior.cities) + '</td>' +
+        '<td class="num">' + p.units + deltaHtml(p.units, prior.units) + '</td>' +
+        '<td class="num gold">' + p.gold + deltaHtml(p.gold, prior.gold) + '</td>' +
+        '<td class="gov">' + esc(p.government) + '</td>' +
+        '<td class="num ' + missedClass(p) + '">' + missedPct(p) + '</td></tr>';
     });
     sec.innerHTML = '<section id="rankings"><div class="section-head"><h2>Rankings</h2><div class="line"></div></div>' +
       '<div class="activity-bar"><div class="summary">' + a.done_count + ' done &middot; ' + a.online_count + ' online &middot; ' + a.logged_in_count + '/' + a.total_players + ' seen this turn</div>' +
       '<div class="legend"><span><span class="st-done">\u2714</span> Done</span><span><span class="st-online">\u25CF</span> Online</span><span><span class="st-seen">\u25CF</span> Seen</span><span><span class="st-none">\u25CB</span> Away</span></div></div>' +
-      '<table><thead><tr><th>#</th><th></th><th>Player</th><th>Score</th><th>Cities</th><th>Units</th><th>Gold</th><th>Gov</th><th title="Missed turns %">Miss%</th><th title="Consecutive turns without logging in">No-login</th><th>Last Seen</th></tr></thead><tbody>' + rows + '</tbody></table></section>';
+      '<table><thead><tr><th>#</th><th></th><th>Player</th><th>Score</th><th>Cities</th><th>Units</th><th>Gold</th><th>Gov</th><th title="Missed turns %">Miss%</th></tr></thead><tbody>' + rows + '</tbody></table></section>';
   }
 
   function renderHistory(d) {
@@ -809,9 +834,10 @@
       '<div class="hl-nav">' +
       '<button id="gz-prev" ' + (gazetteTurn <= 0 ? 'disabled' : '') + '>&larr;</button>' +
       '<span class="hl-label">Turn ' + g.turn + ' &middot; ' + esc(g.year_display) + '</span>' +
+      '<button id="gz-pdf" title="Download this edition as a PDF">PDF</button>' +
       '<button id="gz-next" ' + (gazetteTurn >= entries.length - 1 ? 'disabled' : '') + '>&rarr;</button>' +
       '</div>' +
-      '<div class="gazette">' +
+      '<div class="gazette" id="gazette-print-root">' +
         '<div class="gazette-masthead">' +
           '<div class="gazette-masthead-name">The Civ Chronicle</div>' +
           '<div class="gazette-masthead-sub">All the civilization that\'s fit to print</div>' +
@@ -826,6 +852,48 @@
     });
     document.getElementById('gz-next').addEventListener('click', function() {
       if (gazetteTurn < entries.length - 1) { gazetteTurn++; renderGazette(d); }
+    });
+    document.getElementById('gz-pdf').addEventListener('click', function() {
+      exportGazettePdf(g);
+    });
+  }
+
+  function exportGazettePdf(g) {
+    var btn = document.getElementById('gz-pdf');
+    var el = document.getElementById('gazette-print-root');
+    if (!el || typeof html2canvas !== 'function' || !window.jspdf) {
+      alert('PDF export library not loaded yet — try again in a moment.');
+      return;
+    }
+    var original = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
+    // Render at 2x scale for crisp text, with cross-origin images allowed
+    // (the gazette illustration lives on the same origin, so no proxy needed).
+    html2canvas(el, {
+      scale: 2,
+      backgroundColor: '#f5f0e6',
+      useCORS: true,
+      windowWidth: el.scrollWidth,
+      windowHeight: el.scrollHeight
+    }).then(function(canvas) {
+      var imgData = canvas.toDataURL('image/jpeg', 0.92);
+      // Page size matches the canvas aspect so the edition prints as a single
+      // continuous "newspaper sheet" rather than being awkwardly paginated.
+      var pdf = new window.jspdf.jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'pt',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+      var fname = 'civ-chronicle-turn-' + g.turn + '.pdf';
+      pdf.save(fname);
+    }).catch(function(err) {
+      console.error('PDF export failed', err);
+      alert('PDF export failed: ' + (err && err.message ? err.message : err));
+    }).finally(function() {
+      btn.textContent = original;
+      btn.disabled = false;
     });
   }
 

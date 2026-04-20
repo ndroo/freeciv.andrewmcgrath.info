@@ -64,6 +64,33 @@
   <p class="subtitle">Server updates, fixes, and new features.</p>
 
   <div class="entry">
+    <div class="entry-date">April 19, 2026</div>
+    <div class="entry-title">Rankings: Turn-over-Turn Deltas</div>
+    <ul>
+      <li><span class="tag tag-new">New</span> <strong>Change since last turn</strong> — Score, Cities, Units, and Gold columns now show a small green or red delta next to each value (e.g. <code>+12</code>, <code>&minus;3</code>) reflecting the change since the previous turn's on-disk snapshot. Deltas stay stable through the in-progress turn rather than jittering as players act.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Dropped "No-login" and "Last Seen" columns</strong> — these were noisy and not especially useful. Miss% already captures activity. The underlying data sources (<code>last_seen.txt</code> and the <code>idle_turn_streak</code> / <code>last_seen_epoch</code> fields in status.json) are no longer generated or captured.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">April 19, 2026</div>
+    <div class="entry-title">Chronicle PDF Export &amp; Better Illustrations</div>
+    <ul>
+      <li><span class="tag tag-new">New</span> <strong>Download any edition as PDF</strong> — each Chronicle edition now has a <code>PDF</code> button next to the turn navigator. Click to save the issue as <code>civ-chronicle-turn-N.pdf</code> — a single-page newspaper sheet, perfect for archiving or sharing.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Front-page illustrations stay on topic</strong> — the gazette system prompt now requires the illustrator's scene description to depict a specific concrete moment from the lead story (named subjects, identifiable action) rather than abstract era imagery. Image prompts now lead with the headline and that scene description instead of diluting focus with the full front-page text.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">April 19, 2026</div>
+    <div class="entry-title">Fix Chronicle False-Catastrophe Bug</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>Partial save reads no longer poison history</strong> — the status generator could accept a truncated gzip while freeciv was still writing the turn save, producing a history entry with only a handful of players. That's what gave us the turn 41 Chronicle headline <em>"THE WORLD VANISHES: FOURTEEN NATIONS FALL SILENT"</em>. Decompression now checks gzip's exit code and requires a complete <code>[game]</code> + player section before writing.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Chronicle preflight check</strong> — before generating an edition, the gazette now verifies the target turn's history entry has a plausible player count versus the previous turn. If it looks corrupt it rebuilds the entry directly from the save file, retrying up to 5 times with sleeps. If the data still can't be trusted, the edition is skipped rather than printing a false narrative.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
     <div class="entry-date">April 11, 2026</div>
     <div class="entry-title">Fix Gazette Generation for Large Games</div>
     <ul>

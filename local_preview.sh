@@ -44,7 +44,6 @@ if [ "$PULL" = "true" ]; then
     fly ssh console --app freeciv-longturn -C "sh -c 'cat $f'" > "$SAVE_DIR/$fname" 2>/dev/null
   done
   # Pull support files
-  fly ssh console --app freeciv-longturn -C "sh -c 'cat /data/saves/last_seen.txt'" > "$SAVE_DIR/last_seen.txt" 2>/dev/null || true
   fly ssh console --app freeciv-longturn -C "sh -c 'cat /data/saves/turn_start_epoch'" > "$SAVE_DIR/turn_start_epoch" 2>/dev/null || true
   fly ssh console --app freeciv-longturn -C "sh -c 'cat /data/saves/server.log'" > "$LOGFILE" 2>/dev/null || true
   fly ssh console --app freeciv-longturn -C "sh -c 'sqlite3 /data/saves/freeciv.sqlite .dump'" > "$PREVIEW_DIR/fcdb_dump.sql" 2>/dev/null || true
@@ -55,7 +54,6 @@ if [ "$PULL" = "true" ]; then
 else
   echo "Using test_data/ (run with --pull to fetch from prod)"
   cp "$SCRIPT_DIR/test_data"/lt-game-*.sav.gz "$SAVE_DIR/"
-  cp "$SCRIPT_DIR/test_data/last_seen.txt" "$SAVE_DIR/" 2>/dev/null || true
   cp "$SCRIPT_DIR/test_data/turn_start_epoch" "$SAVE_DIR/" 2>/dev/null || true
   cp "$SCRIPT_DIR/test_data/server.log" "$LOGFILE" 2>/dev/null || true
   if [ -f "$SCRIPT_DIR/test_data/fcdb_auth.sql" ]; then

@@ -97,7 +97,7 @@ if [ ! -f "$SCRIPT_UNDER_TEST" ]; then
 fi
 
 for f in lt-game-1.sav.gz lt-game-2.sav.gz lt-game-3.sav.gz lt-game-4.sav.gz \
-         last_seen.txt turn_start_epoch fcdb_auth.sql server.log; do
+         turn_start_epoch fcdb_auth.sql server.log; do
   if [ ! -f "$TEST_DATA/$f" ]; then
     echo "FATAL: $TEST_DATA/$f not found"
     exit 1
@@ -122,7 +122,6 @@ mkdir -p "$SAVE_DIR" "$WEBROOT"
 cp "$TEST_DATA"/lt-game-*.sav.gz "$SAVE_DIR/"
 
 # Copy support files
-cp "$TEST_DATA/last_seen.txt" "$SAVE_DIR/last_seen.txt"
 cp "$TEST_DATA/turn_start_epoch" "$SAVE_DIR/turn_start_epoch"
 cp "$TEST_DATA/server.log" "$LOGFILE"
 
@@ -244,10 +243,6 @@ assert_eq "No Lion (barbarian) player" "0" "$LION_COUNT"
 FIELD_CHECK=$(jq -r '.players[] | keys | length >= 13 | tostring' "$WEBROOT/status.json" | sort -u)
 assert_eq "All players have at least 13 fields" "true" "$FIELD_CHECK"
 
-# last_seen_epoch key exists on all players
-HAS_LSE=$(jqf '[.players[] | has("last_seen_epoch")] | all | tostring')
-assert_true "All players have last_seen_epoch key" "$HAS_LSE"
-
 # Players sorted by score descending
 IS_SORTED=$(jqf '
   [.players | to_entries[] | {idx: .key, score: .value.score}]
@@ -294,18 +289,6 @@ assert_eq "All stat fields >= 0" "0" "$BAD_STATS"
 # Score, cities, units, gold are integers (not floats)
 INT_CHECK=$(jqf '[.players[] | .score, .cities, .units, .gold | . == (. | floor)] | all | tostring')
 assert_true "All stat fields are integers" "$INT_CHECK"
-
-# idle_turn_streak exists on all players and is integer >= 0
-HAS_IDLE=$(jqf '[.players[] | has("idle_turn_streak")] | all | tostring')
-assert_true "All players have idle_turn_streak" "$HAS_IDLE"
-IDLE_INT=$(jqf '[.players[] | .idle_turn_streak | . == (. | floor) and . >= 0] | all | tostring')
-assert_true "idle_turn_streak is integer >= 0 for all" "$IDLE_INT"
-
-# Specific idle streak values (from test data turn 4)
-ANDREW_IDLE=$(jqf '[.players[] | select(.name == "Andrew") | .idle_turn_streak] | .[0]')
-assert_eq "Andrew idle_turn_streak == 0" "0" "$ANDREW_IDLE"
-HYFEN_IDLE=$(jqf '[.players[] | select(.name == "Hyfen") | .idle_turn_streak] | .[0]')
-assert_eq "Hyfen idle_turn_streak == 2" "2" "$HYFEN_IDLE"
 
 # missed_turns and total_turns exist on all players
 HAS_MISSED=$(jqf '[.players[] | has("missed_turns")] | all | tostring')

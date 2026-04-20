@@ -222,8 +222,6 @@ fi
 
   # Poll log for new connections and auto-take
   LAST_CONN_LINE=0
-  LAST_SEEN_FILE="$SAVE_DIR/last_seen.txt"
-  touch "$LAST_SEEN_FILE"
   while true; do
     CURRENT_LINES=$(wc -l < "$LOGFILE" 2>/dev/null || echo 0)
     if [ "$CURRENT_LINES" -gt "$LAST_CONN_LINE" ]; then
@@ -236,14 +234,6 @@ fi
           name=$(echo "$line" | sed 's/.*[0-9]: \(.*\) has connected from.*/\1/')
           if [ -n "$name" ]; then
             echo "[auto-take] Detected connection: $name"
-            # Record last-seen timestamp (persistent across restarts)
-            NOW_TS=$(date +%s)
-            # Update or add entry in last_seen file (format: username:epoch)
-            if grep -q "^${name}:" "$LAST_SEEN_FILE" 2>/dev/null; then
-              sed -i "s/^${name}:.*/${name}:${NOW_TS}/" "$LAST_SEEN_FILE"
-            else
-              echo "${name}:${NOW_TS}" >> "$LAST_SEEN_FILE"
-            fi
             sleep 1
             echo "take $name $name" >&3
           fi

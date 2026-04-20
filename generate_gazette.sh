@@ -362,7 +362,7 @@ Return JSON with this exact structure:
   "corrections": "correction text or null",
   "illustration_caption": {
     "credit": "credit line as it would appear in a newspaper of this era (e.g. 'Photograph by Dorothea Lange, AP'). Use the era-appropriate medium (carving/painting/engraving/photograph). Do NOT use words like 'period' or 'era' or 'ancient'. This is a newspaper from THAT day.",
-    "description": "plain text description of what the image depicts"
+    "description": "A single concrete visual scene for the illustrator that DIRECTLY depicts the lead story from the front page — one specific moment, one or two subjects, with identifiable action and setting. BAD examples: 'the aftermath of the armistice', 'a nation at a crossroads', 'the tension between empires' (too abstract). GOOD examples: 'A Viking scout on horseback traces a forest border at dusk, mapping the Atlantean frontier', 'Two robed envoys shake hands across a stone table as scribes record the peace', 'Kroony's scouts discover a North Korean explorer charting their interior forests'. Name specific subjects/places when relevant. No text or words will appear in the image."
   }
 }
 
@@ -509,21 +509,24 @@ generate_illustration() {
     art_style="vintage newspaper editorial illustration, pen and ink sketch style, crosshatched shading"
   fi
 
-  # Strip HTML from front page text for the prompt
-  local clean_text
-  clean_text=$(echo "$front_page_text" | sed 's/<[^>]*>//g' | head -c 500)
-
-  # Add artist style if available
+  # Build the scene prompt. Lead with the headline + AI-supplied concrete scene
+  # description; only fall back to front-page prose if the scene description is
+  # missing. Including the full front-page text dilutes the focus and often
+  # produces generic, off-topic images.
   local artist_style=""
   if [ -n "$art_credit" ]; then
     artist_style="In the style described by: ${art_credit}. "
   fi
-  local scene_desc="${clean_text}"
+  local scene_desc
   if [ -n "$illustration_desc" ]; then
-    scene_desc="Scene to depict: ${illustration_desc}. Context: ${clean_text}"
+    scene_desc="Scene to depict (one specific moment from this news story): ${illustration_desc}. Headline for context: \"${headline}\"."
+  else
+    local clean_text
+    clean_text=$(echo "$front_page_text" | sed 's/<[^>]*>//g' | head -c 300)
+    scene_desc="Headline: \"${headline}\". Scene context: ${clean_text}"
   fi
 
-  local prompt="Generate a small newspaper illustration. ${artist_style}Style: ${art_style}. ${scene_desc}. No text or words in the image. Square format, detailed."
+  local prompt="A single newspaper editorial illustration depicting the scene below. ${artist_style}Style: ${art_style}. ${scene_desc} Focus on the specific subjects and action — this is not a generic era scene, it is an image of this exact moment. No text, letters, or words anywhere in the image. Square format, detailed."
 
   local request_body
   request_body=$(jq -n \
@@ -565,6 +568,51 @@ generate_illustration() {
   ln -sf "$SAVE_DIR/$filename" "$WEBROOT/$filename"
   echo "[gazette] Saved illustration: $filename" >&2
   echo "$filename"
+}
+
+# ---------------------------------------------------------------------------
+# Validate the history.json entry for the target turn looks sane before we
+# generate an edition. A partial save read can write an entry with far fewer
+# players than reality (see turn 41: 2 players instead of 16), producing a
+# chronicle that falsely announces catastrophic events.
+#
+# Strategy:
+#   - Check player count for target vs. previous turn.
+#   - If target has 0 players, or <50% of prev turn's count, treat as corrupt.
+#   - Ask generate_status_json.sh --rebuild-turn=N to rebuild from the save.
+#   - Retry up to 5 times, sleeping between attempts to let any in-flight save
+#     finish.
+#   - If still bad, return failure so the caller can skip this edition.
+# ---------------------------------------------------------------------------
+validate_turn_history() {
+  local target="$1"
+  local max_attempts=5
+  local attempt=1
+  while [ "$attempt" -le "$max_attempts" ]; do
+    if [ ! -f "$HISTORY_FILE" ]; then
+      echo "[gazette] history.json missing (attempt $attempt/$max_attempts)" >&2
+      sleep 10
+      attempt=$((attempt + 1))
+      continue
+    fi
+    local cur_n prev_n
+    cur_n=$(jq --argjson t "$target" '[.[] | select(.turn == $t)] | .[0].players // {} | keys | length' "$HISTORY_FILE" 2>/dev/null || echo 0)
+    prev_n=$(jq --argjson t "$((target - 1))" '[.[] | select(.turn == $t)] | .[0].players // {} | keys | length' "$HISTORY_FILE" 2>/dev/null || echo 0)
+    # Sane if target has >=1 player AND (no prev turn, or target >= half of prev).
+    if [ "$cur_n" -gt 0 ] 2>/dev/null && { [ "$prev_n" -eq 0 ] 2>/dev/null || [ "$((cur_n * 2))" -ge "$prev_n" ] 2>/dev/null; }; then
+      return 0
+    fi
+    echo "[gazette] Turn $target history looks corrupt: $cur_n players vs. $prev_n in prev turn (attempt $attempt/$max_attempts)" >&2
+    local turn_save="$SAVE_DIR/lt-game-${target}.sav.gz"
+    if [ -f "$turn_save" ]; then
+      "$SCRIPT_DIR/generate_status_json.sh" --rebuild-turn="$target" >> "$SAVE_DIR/status-generator.log" 2>&1 || true
+    else
+      echo "[gazette] Save file $turn_save not present yet" >&2
+    fi
+    sleep 10
+    attempt=$((attempt + 1))
+  done
+  return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -675,6 +723,10 @@ else
   # Generate for the PREVIOUS turn (current turn just started, previous is complete)
   PREV_TURN=$((TURN - 1))
   [ "$PREV_TURN" -le 1 ] && { echo "[gazette] Too early for gazette (turn $PREV_TURN)"; exit 0; }
+  if ! validate_turn_history "$PREV_TURN"; then
+    echo "[gazette] Skipping edition for turn $PREV_TURN — history entry still looks corrupt after retries"
+    exit 1
+  fi
   process_turn "$PREV_TURN"
 fi
 
