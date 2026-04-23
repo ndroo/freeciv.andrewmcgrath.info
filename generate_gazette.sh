@@ -204,8 +204,8 @@ build_turn_context() {
         }
       ],
 
-      active_wars: [$all_dipl[] | select(.state == "War") | .players],
-      active_alliances: [$all_dipl[] | select(.state == "Alliance") | .players],
+      active_wars: [$all_dipl[] | select(.status == "War") | .players],
+      active_alliances: [$all_dipl[] | select(.status == "Alliance") | .players],
 
       public_events: ($curr.public_events // []),
 

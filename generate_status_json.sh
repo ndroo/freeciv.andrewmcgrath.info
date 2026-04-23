@@ -1101,6 +1101,19 @@ if [ -n "${LATEST_SAVE_FILE:-}" ] && [ -f "$LATEST_SAVE_FILE" ]; then
   SAVE_MTIME=$(stat -c %Y "$LATEST_SAVE_FILE" 2>/dev/null || stat -f %m "$LATEST_SAVE_FILE" 2>/dev/null || echo 0)
 fi
 
+# Gazette publishing marker — set by start.sh's turn-change watcher while a
+# new edition is being generated. Contains the target turn (integer) or is
+# absent when idle. Surfaced so the web UI can show "in print" and
+# turn_notify.sh can refuse to ship a stale edition.
+GAZETTE_PUBLISHING_FILE="${GAZETTE_PUBLISHING_FILE:-$SAVE_DIR/gazette-publishing}"
+GAZETTE_PUBLISHING="null"
+if [ -f "$GAZETTE_PUBLISHING_FILE" ]; then
+  GP_VAL=$(tr -d '[:space:]' < "$GAZETTE_PUBLISHING_FILE" 2>/dev/null || echo "")
+  if [ -n "$GP_VAL" ] && [ "$GP_VAL" -gt 0 ] 2>/dev/null; then
+    GAZETTE_PUBLISHING="$GP_VAL"
+  fi
+fi
+
 # ============================================================================
 # Assemble the final JSON (no history — that's in history.json now)
 # ============================================================================
@@ -1124,6 +1137,7 @@ OUTPUT_JSON=$(jq -n \
   --argjson turn_timeout "${TURN_TIMEOUT}" \
   --argjson save_mtime "${SAVE_MTIME}" \
   --argjson turn_start_epoch "${TURN_START_EPOCH}" \
+  --argjson gazette_publishing "${GAZETTE_PUBLISHING}" \
   --argjson players "$PLAYERS_JSON" \
   --argjson done_count "$DONE_COUNT" \
   --argjson online_count "$ONLINE_COUNT" \
@@ -1148,7 +1162,8 @@ OUTPUT_JSON=$(jq -n \
       deadline_epoch: $deadline_epoch,
       turn_timeout: $turn_timeout,
       save_mtime: $save_mtime,
-      turn_start_epoch: $turn_start_epoch
+      turn_start_epoch: $turn_start_epoch,
+      gazette_publishing: $gazette_publishing
     },
     players: $players,
     activity: {

@@ -26,8 +26,15 @@ MARKER=/tmp/last-notified-turn
 #   REAL_TURN_START_FILE stays at the original turn start time.
 TURN_START_FILE=/data/saves/turn_start_epoch
 REAL_TURN_START_FILE=/data/saves/real_turn_start_epoch
+# Set while a new gazette edition is being generated. Surfaced in status.json
+# so the web UI can show an "in print" banner, and checked by turn_notify.sh
+# so emails don't ship a stale or in-flight edition. Contents: the turn number
+# whose edition is currently being produced.
+GAZETTE_PUBLISHING_FILE=/data/saves/gazette-publishing
 
 mkdir -p "$SAVE_DIR/archived"
+# Clear any stale publishing marker from a previous crashed run
+rm -f "$GAZETTE_PUBLISHING_FILE"
 # Move any existing timestamped saves out of the main directory
 for f in "$SAVE_DIR"/lt-game-*-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*.sav.gz; do
   [ -f "$f" ] && mv "$f" "$SAVE_DIR/archived/"
@@ -287,12 +294,23 @@ fi
           echo "$turn" > "$MARKER"
           date +%s > "$TURN_START_FILE"
           date +%s > "$REAL_TURN_START_FILE"
-          # Estimate year (turn_notify.sh will try to read exact year from save file)
-          year=$(((-4000 + (turn - 1) * 50)))
-          # Refresh status page first so turn_notify.sh can read fresh JSON
+          # Mark the gazette as "in print" — web UI shows a banner and
+          # turn_notify.sh refuses to ship until this clears.
+          echo "$turn" > "$GAZETTE_PUBLISHING_FILE"
+          # Refresh status page first so downstream scripts can read fresh JSON
+          # (and so status.json reflects the publishing marker immediately).
           /opt/freeciv/generate_status_json.sh >> /data/saves/status-generator.log 2>&1
+          # Read the real year from status.json. Do not invent a value — the
+          # old linear estimate (-4000 + (turn-1)*50) was wildly wrong in the
+          # modern era and caused "Year 0 AD" emails when status.json was
+          # unreadable (turn 81 happens to land at 0 in that formula).
+          year=$(jq -r '.game.year // empty' "$WEBROOT/status.json" 2>/dev/null || true)
           # Generate gazette before email so the email can include it
           /opt/freeciv/generate_gazette.sh "$turn" "$year" >> /data/saves/gazette.log 2>&1
+          # Gazette done — clear the publishing marker and refresh status.json
+          # so the UI drops the "in print" banner on next poll.
+          rm -f "$GAZETTE_PUBLISHING_FILE"
+          /opt/freeciv/generate_status_json.sh >> /data/saves/status-generator.log 2>&1
           # Generate player dashboards (incremental — diffs latest turn)
           /opt/freeciv/generate_dashboard.sh >> /data/saves/dashboard.log 2>&1 &
           # Editor proactive outreach (contacts 1-2 interesting players per turn)

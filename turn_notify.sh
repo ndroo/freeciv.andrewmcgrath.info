@@ -55,14 +55,31 @@ RANKINGS_ROWS=""
 YEAR_DISPLAY=""
 TURNS_PLAYED=$((TURN - 1))
 
+# Track whether status.json is internally consistent with the turn we were
+# asked to notify for. When it isn't, we drop the year from the subject line
+# (better than shipping "Year 0 AD") and skip the rankings block.
+STATUS_VALID=false
+
 if [ -f "$STATUS_JSON" ] && jq . "$STATUS_JSON" >/dev/null 2>&1; then
   echo "[turn_notify] Reading stats from $STATUS_JSON"
 
-  # Get year display from JSON
-  YEAR_DISPLAY=$(jq -r '.game.year_display' "$STATUS_JSON")
-  # Also update YEAR from JSON for subject line
-  JSON_YEAR=$(jq -r '.game.year' "$STATUS_JSON")
-  [ -n "$JSON_YEAR" ] && [ "$JSON_YEAR" != "null" ] && YEAR="$JSON_YEAR"
+  # Sanity: refuse to use status.json if it doesn't match the turn we were
+  # told about, or if the year defaulted to 0 (sentinel for "save file
+  # couldn't be parsed"). This prevents the "Turn N — Year 0 AD" emails that
+  # happen when generate_status_json.sh races with a save write.
+  JSON_TURN=$(jq -r '.game.turn // 0' "$STATUS_JSON")
+  JSON_YEAR=$(jq -r '.game.year // 0' "$STATUS_JSON")
+
+  if [ "$JSON_TURN" = "$TURN" ] && [ "$JSON_YEAR" != "0" ] && [ "$JSON_YEAR" != "null" ]; then
+    STATUS_VALID=true
+    YEAR_DISPLAY=$(jq -r '.game.year_display' "$STATUS_JSON")
+    YEAR="$JSON_YEAR"
+  else
+    echo "[turn_notify] WARNING: status.json turn=$JSON_TURN year=$JSON_YEAR does not match expected turn=$TURN — skipping rankings/year"
+  fi
+fi
+
+if [ "$STATUS_VALID" = "true" ]; then
 
   # Build rankings rows from players array (already sorted by rank)
   NUM_PLAYERS=$(jq '.players | length' "$STATUS_JSON")
@@ -118,9 +135,29 @@ fi
 # ============================================================
 # Read latest gazette entry
 # ============================================================
+# Only include the gazette if (a) the publishing marker is clear — start.sh
+# removes it after generate_gazette.sh finishes — and (b) the newest gazette
+# entry describes turn N-1 (the turn we were just notified about is N). If
+# either check fails, we ship rankings-only rather than shipping a stale
+# edition branded with the current turn.
 GAZETTE_HTML=""
-if [ -f "$GAZETTE_JSON" ] && jq . "$GAZETTE_JSON" >/dev/null 2>&1; then
+GAZETTE_PUBLISHING_FILE="${GAZETTE_PUBLISHING_FILE:-${SAVE_DIR:-/data/saves}/gazette-publishing}"
+EXPECTED_GZ_TURN=$((TURN - 1))
+GAZETTE_READY=true
+if [ -f "$GAZETTE_PUBLISHING_FILE" ]; then
+  echo "[turn_notify] WARNING: gazette publishing marker present — skipping gazette block"
+  GAZETTE_READY=false
+fi
+
+if [ "$GAZETTE_READY" = "true" ] && [ -f "$GAZETTE_JSON" ] && jq . "$GAZETTE_JSON" >/dev/null 2>&1; then
   GAZETTE_ENTRY=$(jq -r '.[-1] // empty' "$GAZETTE_JSON")
+  if [ -n "$GAZETTE_ENTRY" ]; then
+    GZ_ENTRY_TURN=$(echo "$GAZETTE_ENTRY" | jq -r '.turn // 0')
+    if [ "$GZ_ENTRY_TURN" != "$EXPECTED_GZ_TURN" ]; then
+      echo "[turn_notify] WARNING: latest gazette is turn $GZ_ENTRY_TURN, expected $EXPECTED_GZ_TURN — skipping gazette block"
+      GAZETTE_ENTRY=""
+    fi
+  fi
   if [ -n "$GAZETTE_ENTRY" ]; then
     GZ_HEADLINE=$(echo "$GAZETTE_ENTRY" | jq -r '.headline // empty')
     GZ_YEAR=$(echo "$GAZETTE_ENTRY" | jq -r '.year_display // empty')
@@ -170,13 +207,11 @@ if [ -f "$GAZETTE_JSON" ] && jq . "$GAZETTE_JSON" >/dev/null 2>&1; then
   fi
 fi
 
-# Fallback year display
-if [ -z "$YEAR_DISPLAY" ] || [ "$YEAR_DISPLAY" = "null" ]; then
-  if [ "$YEAR" -lt 0 ] 2>/dev/null; then
-    YEAR_DISPLAY="$(echo "$YEAR" | sed 's/-//') BC"
-  else
-    YEAR_DISPLAY="${YEAR} AD"
-  fi
+# Year display fallback — only if we have a real, non-zero year from a valid
+# status.json. If STATUS_VALID is false, we omit the year from the subject
+# rather than ship a made-up one (previously the code happily emitted "0 AD").
+if [ "$STATUS_VALID" != "true" ] || [ -z "$YEAR_DISPLAY" ] || [ "$YEAR_DISPLAY" = "null" ]; then
+  YEAR_DISPLAY=""
 fi
 
 # ============================================================
@@ -199,7 +234,11 @@ echo "$EMAILS" | while IFS='|' read -r NAME EMAIL; do
   [ -z "$EMAIL" ] && continue
   echo "[turn_notify] Sending to $NAME ($EMAIL)"
 
-  SUBJECT="Turn $TURN — Year $YEAR_DISPLAY — Your move, $NAME!"
+  if [ -n "$YEAR_DISPLAY" ]; then
+    SUBJECT="Turn $TURN — Year $YEAR_DISPLAY — Your move, $NAME!"
+  else
+    SUBJECT="Turn $TURN — Your move, $NAME!"
+  fi
 
   EMAIL_MSG=$(cat <<EMAILEOF
 From: Freeciv Server <$FROM_EMAIL>
@@ -218,7 +257,7 @@ Content-Type: text/html; charset=UTF-8
   <div style="background:#0f3460;padding:20px 24px;text-align:center;">
     <div style="font-size:14px;letter-spacing:2px;text-transform:uppercase;color:#537895;margin-bottom:4px;">Freeciv Longturn</div>
     <div style="font-size:28px;font-weight:800;color:#fff;">Turn ${TURN}</div>
-    <div style="font-size:15px;color:#8eaccd;margin-top:2px;">${YEAR_DISPLAY} &middot; ${TURNS_PLAYED} turns played</div>
+    <div style="font-size:15px;color:#8eaccd;margin-top:2px;">$([ -n "$YEAR_DISPLAY" ] && echo "${YEAR_DISPLAY} &middot; ")${TURNS_PLAYED} turns played</div>
   </div>
 
   <div style="padding:24px;">

@@ -218,6 +218,10 @@ EXPECTED_DEADLINE=$((EXPECTED_TSE + 82800))
 assert_eq "game.deadline_epoch == turn_start_epoch + 82800" \
   "$EXPECTED_DEADLINE" "$(jqf '.game.deadline_epoch')"
 
+# gazette_publishing defaults to null when no marker file exists
+assert_eq "game.gazette_publishing == null when no marker" \
+  "null" "$(jqf '.game.gazette_publishing')"
+
 SAVE_MTIME=$(jqf '.game.save_mtime')
 assert_gt "game.save_mtime > 0" "$SAVE_MTIME" "0"
 
@@ -515,6 +519,78 @@ fi
 RECOVERY_LEN=$(hjqf '. | length')
 assert_eq "Recovery: history has 1 entry (current turn only)" "1" "$RECOVERY_LEN"
 assert_eq "Recovery: entry is turn 4" "4" "$(hjqf '.[0].turn')"
+
+# =============================================================================
+# Test: gazette_publishing marker is surfaced in status.json
+# =============================================================================
+echo ""
+echo "=== Run 6: gazette_publishing marker ==="
+# Write the marker containing a target turn (the turn whose edition is being
+# generated). start.sh sets this at the beginning of turn-change processing.
+echo "5" > "$SAVE_DIR/gazette-publishing"
+
+SAVE_DIR="$SAVE_DIR" \
+  WEBROOT="$WEBROOT" \
+  DB_PATH="$DB_PATH" \
+  LOGFILE="$LOGFILE" \
+  SERVER_HOST="freeciv.andrewmcgrath.info" \
+  /opt/homebrew/bin/bash "$SCRIPT_UNDER_TEST" --no-live 2>&1
+
+echo ""
+echo "--- gazette_publishing marker ---"
+assert_eq "game.gazette_publishing == 5 when marker set to 5" \
+  "5" "$(jqf '.game.gazette_publishing')"
+
+# Remove the marker and verify it's cleared on next run
+rm -f "$SAVE_DIR/gazette-publishing"
+SAVE_DIR="$SAVE_DIR" \
+  WEBROOT="$WEBROOT" \
+  DB_PATH="$DB_PATH" \
+  LOGFILE="$LOGFILE" \
+  SERVER_HOST="freeciv.andrewmcgrath.info" \
+  /opt/homebrew/bin/bash "$SCRIPT_UNDER_TEST" --no-live 2>&1
+
+assert_eq "game.gazette_publishing == null after marker removed" \
+  "null" "$(jqf '.game.gazette_publishing')"
+
+# A garbage marker (non-integer) should be treated as "not publishing"
+echo "not-a-number" > "$SAVE_DIR/gazette-publishing"
+SAVE_DIR="$SAVE_DIR" \
+  WEBROOT="$WEBROOT" \
+  DB_PATH="$DB_PATH" \
+  LOGFILE="$LOGFILE" \
+  SERVER_HOST="freeciv.andrewmcgrath.info" \
+  /opt/homebrew/bin/bash "$SCRIPT_UNDER_TEST" --no-live 2>&1
+
+assert_eq "game.gazette_publishing == null when marker is garbage" \
+  "null" "$(jqf '.game.gazette_publishing')"
+rm -f "$SAVE_DIR/gazette-publishing"
+
+# =============================================================================
+# Test: regression guards — typos and bad fallbacks we've previously removed
+# =============================================================================
+echo ""
+echo "--- regression guards ---"
+
+# The gazette previously filtered diplomacy by `.state`, but the actual field
+# is `.status`. That typo produced empty active_wars/active_alliances and led
+# the AI to hallucinate "world peace" headlines. Catch a re-introduction.
+GAZETTE_SH="$SCRIPT_DIR/generate_gazette.sh"
+BAD_STATE_USES=$({ grep -cE '\$all_dipl\[\] \| select\(\.state ==' "$GAZETTE_SH" || true; } | head -1)
+assert_eq "generate_gazette.sh uses .status not .state on \$all_dipl" \
+  "0" "$BAD_STATE_USES"
+GOOD_STATUS_USES=$({ grep -cE '\$all_dipl\[\] \| select\(\.status ==' "$GAZETTE_SH" || true; } | head -1)
+assert_ge "generate_gazette.sh has at least 2 .status filters on \$all_dipl" \
+  "$GOOD_STATUS_USES" "2"
+
+# start.sh used to seed a wildly wrong year from a linear estimate when
+# status.json was unreadable: year = -4000 + (turn - 1) * 50. Turn 81 landed
+# exactly at year=0, producing "Year 0 AD" emails. Make sure that never comes
+# back.
+START_SH="$SCRIPT_DIR/start.sh"
+BAD_YEAR_EST=$({ grep -cE 'year=\$\(\(\(-4000.*turn.*-.*1.*\*.*50\)\)\)' "$START_SH" || true; } | head -1)
+assert_eq "start.sh no longer uses linear year estimate" \
+  "0" "$BAD_YEAR_EST"
 
 # =============================================================================
 # Test: rebuild-history recovers all turns
