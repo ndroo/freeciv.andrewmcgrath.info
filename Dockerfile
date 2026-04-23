@@ -79,6 +79,7 @@ COPY email_enabled.settings /opt/freeciv/email_enabled.settings
 COPY start.sh /opt/freeciv/start.sh
 COPY generate_status_json.sh /opt/freeciv/generate_status_json.sh
 COPY generate_gazette.sh /opt/freeciv/generate_gazette.sh
+COPY lib_diplomacy.sh /opt/freeciv/lib_diplomacy.sh
 COPY generate_nations.sh /opt/freeciv/generate_nations.sh
 COPY www/index.html /opt/freeciv/www/index.html
 COPY www/changelog.html /opt/freeciv/www/changelog.html
