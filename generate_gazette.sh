@@ -22,6 +22,10 @@ GAZETTE_FILE="$SAVE_DIR/gazette.json"
 HISTORY_FILE="$SAVE_DIR/history.json"
 DIPLOMACY_FILE="$SAVE_DIR/diplomacy.json"
 
+# Shared diplomacy-event classifier (defines CLASSIFY_EVENT_JQ_DEF)
+# shellcheck source=lib_diplomacy.sh
+. "$SCRIPT_DIR/lib_diplomacy.sh"
+
 # Provider: anthropic or openai (default: openai)
 GAZETTE_PROVIDER="${GAZETTE_PROVIDER:-}"
 if [ -z "$GAZETTE_PROVIDER" ] && [ -f "$SCRIPT_DIR/.env" ]; then
@@ -132,6 +136,8 @@ build_turn_context() {
   echo "$recent_history" > "$_tmpdir/hist.json"
 
   local context
+  # The classifier def (CLASSIFY_EVENT_JQ_DEF) is concatenated at the front
+  # of the jq program so `classify_event` is in scope throughout.
   context=$(jq -n \
     --slurpfile player_subs "$_tmpdir/subs.json" \
     --slurpfile curr "$_tmpdir/curr.json" \
@@ -139,7 +145,8 @@ build_turn_context() {
     --slurpfile dipl_events "$_tmpdir/dipl_events.json" \
     --slurpfile all_dipl "$_tmpdir/all_dipl.json" \
     --slurpfile all_history "$_tmpdir/hist.json" \
-    '$player_subs[0] as $player_subs | $curr[0] as $curr | $prev[0] as $prev | $dipl_events[0] as $dipl_events | $all_dipl[0] as $all_dipl | $all_history[0] as $all_history |
+    "$CLASSIFY_EVENT_JQ_DEF"'
+    $player_subs[0] as $player_subs | $curr[0] as $curr | $prev[0] as $prev | $dipl_events[0] as $dipl_events | $all_dipl[0] as $all_dipl | $all_history[0] as $all_history |
     {
       turn: $curr.turn,
       year: $curr.year,
@@ -191,18 +198,9 @@ build_turn_context() {
         }
       ) else null end),
 
-      diplomacy_events: [
-        $dipl_events[] | {
-          players: .players,
-          type: (if .to == "Contact" then "first_contact"
-                 elif .to == "War" then "war_declared"
-                 elif .to == "Peace" then "peace_signed"
-                 elif .to == "Alliance" then "alliance_formed"
-                 elif .to == "Ceasefire" then "ceasefire"
-                 elif .to == "Armistice" then "armistice"
-                 else .from + " -> " + .to end)
-        }
-      ],
+      diplomacy_events: [$dipl_events[] | classify_event],
+      treaties_signed_this_turn: [$dipl_events[] | classify_event | select(.negotiated_this_turn == true)],
+      automatic_transitions_this_turn: [$dipl_events[] | classify_event | select(.negotiated_this_turn == false)],
 
       active_wars: [$all_dipl[] | select(.status == "War") | .players],
       active_alliances: [$all_dipl[] | select(.status == "Alliance") | .players],
@@ -297,7 +295,13 @@ BE CONCISE. Each section should be 1-2 short paragraphs, not feature-length arti
 - **deltas**: changes since last turn (casualties, government changes, wonder/culture/pollution shifts, new cities)
 - **trends**: 5-turn rolling data for cities, units, score, pollution, culture — use these to identify trajectories
 - **notable**: computed story hooks — score spread, most warlike player, biggest casualties, underdogs, unusual government holdouts, dead players
-- **diplomacy_events / active_wars / active_alliances**: diplomatic landscape
+- **diplomacy_events / active_wars / active_alliances**: diplomatic landscape. Every event has a `category` and a `negotiated_this_turn` boolean. Also surfaced directly: `treaties_signed_this_turn` (the real deals struck THIS turn) and `automatic_transitions_this_turn` (state maturations that required no new agreement).
+- **CRITICAL — diplomacy semantics**: Freeciv has AUTOMATIC state transitions that look like signed treaties but are not. Do NOT conflate them.
+  - `peace_took_effect` (Armistice → Peace) is AUTOMATIC. The peace treaty was locked in when the cease-fire was signed many turns earlier — this is only the formal maturation. Report as "peace formally takes effect" or "longstanding armistice matures into peace", NOT as "signed a peace treaty this turn".
+  - `armistice_began` (Ceasefire → Armistice or Contact → Armistice) is AUTOMATIC.
+  - `first_contact` (Never met → anything) is not a negotiation, just a first sighting.
+  - Only events with `negotiated_this_turn: true` are deals struck this turn: `war_declared`, `ceasefire_signed`, `peace_signed` (direct — rare), `alliance_formed`.
+  - When tallying player activity ("X signed Y treaties this turn"), count ONLY from `treaties_signed_this_turn`. Do not add automatic transitions or first contacts to that count. Do not attribute another pair's deal to a player uninvolved in it.
 - **public_events**: wonder completions, revolts, city foundings
 - **wonder_holders / spaceship_progress / culture_leaders**: achievement data
 - **player_submissions**: Correspondence between the editor and in-game leaders. Includes player messages and editor replies, with a `pub_status` field showing whether each was already published (e.g. "Published in edition 99") or "Not yet published". You have FULL editorial discretion to quote, paraphrase, or reference any material. Treat player messages as on-the-record statements from public figures. Prefer unpublished material — avoid re-quoting things already published in a previous edition unless following up on a story. Weave the best material into articles naturally. Not everything needs to be used.
