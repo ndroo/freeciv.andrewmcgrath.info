@@ -847,19 +847,30 @@ if [ "$TURN" != "0" ] && [ "$NO_LIVE" = "false" ] && [ -p /tmp/server-input ]; t
     done < <(tail -n +"$((TURN_START_LINE + 1))" "$LOGFILE" 2>/dev/null | grep "has connected from")
   fi
 
-  # Force a live save to capture current phase_done state
+  # Force a live save to capture current phase_done state.
+  # Save to a "pending" name and wait for the server to log completion of THIS
+  # specific save (match the path so we don't false-trigger on a concurrent
+  # auto-save). Then mv into the canonical name — freeciv writes saves
+  # directly to the target with no temp+rename, so a reader without this
+  # fence can see partial gzip data (see savemain.c:139).
+  rm -f /tmp/status-snapshot-pending.sav* /tmp/status-snapshot.sav*
   PRE_SAVE_LINES=$(wc -l < "$LOGFILE" 2>/dev/null || echo 0)
-  rm -f /tmp/status-snapshot.sav*
-  echo "save /tmp/status-snapshot" > /tmp/server-input 2>/dev/null
-  # Wait for server to confirm save is complete (check log for "Game saved" message)
+  echo "save /tmp/status-snapshot-pending" > /tmp/server-input 2>/dev/null
   SNAP_WAIT=0
-  while [ $SNAP_WAIT -lt 10 ]; do
+  while [ $SNAP_WAIT -lt 15 ]; do
     sleep 1
     SNAP_WAIT=$((SNAP_WAIT + 1))
-    tail -n +"$((PRE_SAVE_LINES + 1))" "$LOGFILE" 2>/dev/null | grep -q "Game saved as" && break
+    tail -n +"$((PRE_SAVE_LINES + 1))" "$LOGFILE" 2>/dev/null \
+      | grep -q "Game saved as /tmp/status-snapshot-pending" && break
   done
 
-  SNAP_FILE=$(ls -1t /tmp/status-snapshot.sav* 2>/dev/null | head -1)
+  PENDING_FILE=$(ls -1t /tmp/status-snapshot-pending.sav* 2>/dev/null | head -1)
+  SNAP_FILE=""
+  if [ -n "$PENDING_FILE" ] && [ -f "$PENDING_FILE" ]; then
+    SNAP_FILE="${PENDING_FILE/-pending/}"
+    mv "$PENDING_FILE" "$SNAP_FILE"
+  fi
+
   if [ -n "$SNAP_FILE" ] && [ -f "$SNAP_FILE" ]; then
     SNAP_TMP=$(decompress_save "$SNAP_FILE") || true
     if [ -n "${SNAP_TMP:-}" ] && [ -s "$SNAP_TMP" ]; then

@@ -64,6 +64,14 @@
   <p class="subtitle">Server updates, fixes, and new features.</p>
 
   <div class="entry">
+    <div class="entry-date">April 24, 2026</div>
+    <div class="entry-title">No More False Turn-Reminder Emails</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>"Hey, your turn is due!" emails to players who'd already finished</strong> — the reminder script was forcing a save snapshot to read <code>phase_done</code> for each player, then sleeping a fixed 4 seconds before reading the file. Freeciv writes saves directly to the target path with no temp+rename, so when the save took longer than 4s (it took ~5s on turn 47), the script read a partially-written gzip stream. Players whose section happened to land past the truncation point — like Ihop on turn 47 — were silently misread as having an empty <code>phase_done</code>, which the slacker check treated as "not done." Now the reminder writes to a <code>-pending</code> filename, polls the server log for the specific "Game saved as" confirmation of <em>that</em> save, then atomically <code>mv</code>s into place before reading. The status-page snapshot had the same race (its log poll matched any save, so a concurrent auto-save could unblock it early) — fixed in the same way.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
     <div class="entry-date">April 23, 2026</div>
     <div class="entry-title">Chronicle Accuracy &amp; "In Print" Banner</div>
     <ul>

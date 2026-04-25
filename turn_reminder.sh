@@ -72,15 +72,30 @@ while true; do
   if [ -n "$TEST_TO" ] || [ -n "$DRY_RUN" ] || { [ "$REMAINING" -gt 60 ] && [ "$REMAINING" -le 7200 ]; }; then
     echo "[turn-reminder] Turn $CURRENT_TURN: ${REMAINING}s remaining — checking who hasn't finished"
 
-    # Force a snapshot to get current phase_done state
-    echo "save /tmp/reminder-snapshot" > /tmp/server-input 2>/dev/null
-    sleep 4
+    # Force a snapshot to get current phase_done state.
+    # Save to a "pending" name, wait for the server log to confirm completion
+    # (freeciv writes saves directly to the target with no temp+rename, so
+    # readers can see partial gzip data otherwise — see savemain.c:139).
+    # Then mv into the canonical name so the file we read is always complete.
+    rm -f /tmp/reminder-snapshot-pending.sav* /tmp/reminder-snapshot.sav*
+    PRE_SAVE_LINES=$(wc -l < "$LOGFILE" 2>/dev/null || echo 0)
+    echo "save /tmp/reminder-snapshot-pending" > /tmp/server-input 2>/dev/null
 
-    SNAP_FILE=$(ls -1t /tmp/reminder-snapshot.sav* 2>/dev/null | head -1)
-    if [ -z "$SNAP_FILE" ]; then
-      echo "[turn-reminder] Snapshot failed, will retry"
+    SNAP_WAIT=0
+    while [ $SNAP_WAIT -lt 15 ]; do
+      sleep 1
+      SNAP_WAIT=$((SNAP_WAIT + 1))
+      tail -n +"$((PRE_SAVE_LINES + 1))" "$LOGFILE" 2>/dev/null \
+        | grep -q "Game saved as /tmp/reminder-snapshot-pending" && break
+    done
+
+    PENDING_FILE=$(ls -1t /tmp/reminder-snapshot-pending.sav* 2>/dev/null | head -1)
+    if [ -z "$PENDING_FILE" ]; then
+      echo "[turn-reminder] Snapshot did not complete within ${SNAP_WAIT}s, will retry"
       continue
     fi
+    SNAP_FILE="${PENDING_FILE/-pending/}"
+    mv "$PENDING_FILE" "$SNAP_FILE"
 
     SNAP_TMP=$(mktemp /tmp/freeciv-remind-XXXXXX)
     case "$SNAP_FILE" in
