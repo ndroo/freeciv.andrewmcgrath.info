@@ -25,6 +25,8 @@ DIPLOMACY_FILE="$SAVE_DIR/diplomacy.json"
 # Shared diplomacy-event classifier (defines CLASSIFY_EVENT_JQ_DEF)
 # shellcheck source=lib_diplomacy.sh
 . "$SCRIPT_DIR/lib_diplomacy.sh"
+# shellcheck source=lib_log.sh
+. "$SCRIPT_DIR/lib_log.sh"
 
 # Provider: anthropic or openai (default: openai)
 GAZETTE_PROVIDER="${GAZETTE_PROVIDER:-}"
@@ -624,19 +626,24 @@ validate_turn_history() {
 # ---------------------------------------------------------------------------
 process_turn() {
   local target_turn="$1"
+  local _pt
+  _pt=$(plog_begin gazette "process_turn ${target_turn}")
 
   # Skip if already generated
   local exists
   exists=$(echo "$GAZETTE_JSON" | jq --argjson t "$target_turn" '[.[] | select(.turn == $t)] | length')
   if [ "$exists" -gt 0 ] && [ "$REBUILD" = "false" ]; then
     echo "[gazette] Turn $target_turn already exists, skipping"
+    plog_end gazette "process_turn ${target_turn} (already exists)" "$_pt"
     return 0
   fi
 
   echo "[gazette] Generating gazette for turn $target_turn..."
-  local context
+  local _bc context
+  _bc=$(plog_begin gazette "build_turn_context ${target_turn}")
   context=$(build_turn_context "$target_turn")
-  [ "$context" = "{}" ] && { echo "[gazette] No history data for turn $target_turn"; return 0; }
+  plog_end gazette "build_turn_context ${target_turn}" "$_bc"
+  [ "$context" = "{}" ] && { echo "[gazette] No history data for turn $target_turn"; plog_end gazette "process_turn ${target_turn} (no history)" "$_pt"; return 0; }
 
   # Get previous issue for continuity
   local prev_issue
@@ -650,8 +657,29 @@ process_turn() {
   # Inject recent headlines into context
   context=$(echo "$context" | jq --argjson rh "$recent_headlines" '. + {recent_headlines: $rh}')
 
-  local entry
-  entry=$(generate_entry "$context" "$prev_issue") || return 1
+  local entry="" attempt=1 max_attempts=3
+  while [ "$attempt" -le "$max_attempts" ]; do
+    local _ga
+    _ga=$(plog_begin gazette "generate_entry attempt ${attempt}/${max_attempts} (turn ${target_turn}, provider=${GAZETTE_PROVIDER})")
+    if entry=$(generate_entry "$context" "$prev_issue"); then
+      plog_end gazette "generate_entry attempt ${attempt}/${max_attempts} OK" "$_ga"
+      break
+    fi
+    plog_end gazette "generate_entry attempt ${attempt}/${max_attempts} FAILED" "$_ga"
+    entry=""
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      local backoff=$((attempt * 5))
+      echo "[gazette] generate_entry failed for turn $target_turn (attempt $attempt/$max_attempts), retrying in ${backoff}s..." >&2
+      plog gazette "sleeping ${backoff}s before retry"
+      sleep "$backoff"
+    fi
+    attempt=$((attempt + 1))
+  done
+  if [ -z "$entry" ]; then
+    echo "[gazette] generate_entry failed for turn $target_turn after $max_attempts attempts" >&2
+    plog gazette "ABORT: all ${max_attempts} attempts failed for turn ${target_turn}"
+    return 1
+  fi
 
   local year
   year=$(echo "$context" | jq -r '.year')
@@ -665,7 +693,10 @@ process_turn() {
   fp_content=$(echo "$entry" | jq -r '.sections.front_page.content // .sections.front_page // ""')
   ill_credit=$(echo "$entry" | jq -r '.illustration_caption.credit // ""')
   ill_desc=$(echo "$entry" | jq -r '.illustration_caption.description // ""')
+  local _ill
+  _ill=$(plog_begin gazette "generate_illustration ${target_turn}")
   illustration=$(generate_illustration "$headline" "$year" "$target_turn" "$fp_content" "$ill_credit" "$ill_desc") || true
+  plog_end gazette "generate_illustration ${target_turn} (out=${illustration:-none})" "$_ill"
 
   # Remove existing entry for this turn if rebuilding
   GAZETTE_JSON=$(echo "$GAZETTE_JSON" | jq --argjson t "$target_turn" '[.[] | select(.turn != $t)]')
@@ -694,12 +725,15 @@ process_turn() {
   echo "$GAZETTE_JSON" > "$GAZETTE_FILE.tmp"
   mv "$GAZETTE_FILE.tmp" "$GAZETTE_FILE"
   ln -sf "$GAZETTE_FILE" "$WEBROOT/gazette.json"
+  plog gazette "wrote ${GAZETTE_FILE} ($(stat -c %s "$GAZETTE_FILE" 2>/dev/null || echo ?)B)"
 
   # Mark unpublished player messages as used in this edition
   local DB_PATH="${DB_PATH:-/data/saves/freeciv.sqlite}"
   if [ -f "$DB_PATH" ]; then
     sqlite3 "$DB_PATH" "UPDATE editor_messages SET published=$target_turn WHERE role='player' AND published=0;" 2>/dev/null || true
+    plog gazette "stamped player messages as published=${target_turn}"
   fi
+  plog_end gazette "process_turn ${target_turn}" "$_pt"
 
   echo "[gazette] Generated: $(echo "$entry" | jq -r '.headline')"
 }
@@ -707,6 +741,7 @@ process_turn() {
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+plog gazette "invoked args=$* provider=${GAZETTE_PROVIDER}"
 
 if [ "$REBUILD" = "true" ]; then
   echo "[gazette] Rebuilding gazette for all turns..."

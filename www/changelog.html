@@ -64,6 +64,15 @@
   <p class="subtitle">Server updates, fixes, and new features.</p>
 
   <div class="entry">
+    <div class="entry-date">April 29, 2026</div>
+    <div class="entry-title">Chronicle Retries + Turn-Change Pipeline Logging</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>Chronicle retries when the AI hands back malformed JSON</strong> — turn 51's edition failed to publish because the model returned JSON with an extra closing brace and there was no retry. The generator now makes up to 3 attempts with 5s/10s backoff before giving up, which covers the most common transient failure (one bad sample at temperature 0.9). Turn 51's missing edition was regenerated manually.</li>
+      <li><span class="tag tag-new">New</span> <strong>Single timeline for the turn-change pipeline</strong> — every script that participates in a turn change (turn-watcher, status-json, gazette, dashboard, editor outreach, turn notify, auto-saver) now writes timestamped BEGIN/END events with elapsed seconds to <code>/data/saves/turn-pipeline.log</code>. Logged through a shared helper (<code>lib_log.sh</code>) so all entries share an ISO-8601 UTC format. This is in service of diagnosing reports of the countdown sticking at 0:00 for hours after a turn change — next turn the log will say which stage stalled (lock contention, hung API call, slow archive cleanup, etc.).</li>
+    </ul>
+  </div>
+
+  <div class="entry">
     <div class="entry-date">April 24, 2026</div>
     <div class="entry-title">No More False Turn-Reminder Emails</div>
     <ul>

@@ -32,6 +32,11 @@ REAL_TURN_START_FILE=/data/saves/real_turn_start_epoch
 # whose edition is currently being produced.
 GAZETTE_PUBLISHING_FILE=/data/saves/gazette-publishing
 
+# Timestamped pipeline logger — see lib_log.sh
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib_log.sh"
+plog start.sh "process starting (pid=$$)"
+
 mkdir -p "$SAVE_DIR/archived"
 # Clear any stale publishing marker from a previous crashed run
 rm -f "$GAZETTE_PUBLISHING_FILE"
@@ -46,6 +51,7 @@ touch "$LOGFILE"
 # Trap SIGTERM (sent by Fly.io on deploy) — force a save before shutting down
 shutdown_save() {
   echo "[shutdown] SIGTERM received — forcing save before exit"
+  plog start.sh "SIGTERM received — forcing save before exit"
   echo "save" > "$FIFO" 2>/dev/null
   sleep 3
   # Timestamp the shutdown save and update save-latest
@@ -259,6 +265,7 @@ fi
   done
 
   echo "[turn-watcher] Started monitoring for turn changes"
+  plog turn-watcher "started monitoring (poll=5s)"
 
   # Track the line count we've already processed
   LAST_LINE=0
@@ -277,52 +284,72 @@ fi
       if [ -n "$new_save" ]; then
         turn=$(echo "$new_save" | sed 's/.*lt-game-\([0-9]*\).*/\1/')
         last_notified=$(cat "$MARKER" 2>/dev/null || echo 1)
+        plog turn-watcher "save event: lt-game-${turn} (marker=${last_notified}, log line=${CURRENT_LINES})"
 
         # Timestamp the save file and update save-latest
         SAVE_FILE="$SAVE_DIR/lt-game-${turn}.sav.gz"
         if [ -f "$SAVE_FILE" ]; then
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           TIMESTAMPED="$SAVE_DIR/archived/lt-game-${turn}-${TIMESTAMP}.sav.gz"
+          SAVE_BYTES=$(stat -c %s "$SAVE_FILE" 2>/dev/null || echo 0)
           cp "$SAVE_FILE" "$TIMESTAMPED"
           cp "$SAVE_FILE" "$SAVE_DIR/save-latest.sav.gz"
           echo "[turn-watcher] Archived save: archived/$TIMESTAMPED"
+          plog turn-watcher "archived ${SAVE_BYTES}B to archived/$(basename "$TIMESTAMPED")"
         fi
 
         echo "[turn-watcher] Detected save for turn $turn (last notified: $last_notified)"
 
         if [ -n "$turn" ] && [ "$turn" -gt "$last_notified" ] 2>/dev/null; then
+          plog turn-watcher "TURN CHANGE: ${last_notified} -> ${turn}"
           echo "$turn" > "$MARKER"
           date +%s > "$TURN_START_FILE"
           date +%s > "$REAL_TURN_START_FILE"
+          plog turn-watcher "wrote turn_start_epoch=$(cat "$TURN_START_FILE")"
           # Mark the gazette as "in print" — web UI shows a banner and
           # turn_notify.sh refuses to ship until this clears.
           echo "$turn" > "$GAZETTE_PUBLISHING_FILE"
+          plog turn-watcher "set gazette-publishing marker to ${turn}"
           # Refresh status page first so downstream scripts can read fresh JSON
           # (and so status.json reflects the publishing marker immediately).
+          _t=$(plog_begin turn-watcher "status.json refresh #1 (pre-gazette)")
           /opt/freeciv/generate_status_json.sh >> /data/saves/status-generator.log 2>&1
+          plog_end turn-watcher "status.json refresh #1 (pre-gazette)" "$_t"
           # Read the real year from status.json. Do not invent a value — the
           # old linear estimate (-4000 + (turn-1)*50) was wildly wrong in the
           # modern era and caused "Year 0 AD" emails when status.json was
           # unreadable (turn 81 happens to land at 0 in that formula).
           year=$(jq -r '.game.year // empty' "$WEBROOT/status.json" 2>/dev/null || true)
+          plog turn-watcher "status.json reports year=${year:-unknown}"
           # Generate gazette before email so the email can include it
+          _t=$(plog_begin turn-watcher "generate_gazette.sh ${turn}")
           /opt/freeciv/generate_gazette.sh "$turn" "$year" >> /data/saves/gazette.log 2>&1
+          _gazette_rc=$?
+          plog_end turn-watcher "generate_gazette.sh ${turn} rc=${_gazette_rc}" "$_t"
           # Gazette done — clear the publishing marker and refresh status.json
           # so the UI drops the "in print" banner on next poll.
           rm -f "$GAZETTE_PUBLISHING_FILE"
+          plog turn-watcher "cleared gazette-publishing marker"
+          _t=$(plog_begin turn-watcher "status.json refresh #2 (post-gazette)")
           /opt/freeciv/generate_status_json.sh >> /data/saves/status-generator.log 2>&1
+          plog_end turn-watcher "status.json refresh #2 (post-gazette)" "$_t"
           # Generate player dashboards (incremental — diffs latest turn)
           /opt/freeciv/generate_dashboard.sh >> /data/saves/dashboard.log 2>&1 &
+          plog turn-watcher "dispatched generate_dashboard.sh (bg pid=$!)"
           # Editor proactive outreach (contacts 1-2 interesting players per turn)
           /opt/freeciv/respond_to_editor.sh --outreach >> /data/saves/editor.log 2>&1 &
+          plog turn-watcher "dispatched respond_to_editor.sh --outreach (bg pid=$!)"
           echo "[turn-watcher] Triggering notification for turn $turn"
           /opt/freeciv/turn_notify.sh "$turn" "$year" &
+          plog turn-watcher "dispatched turn_notify.sh ${turn} (bg pid=$!)"
 
           # Clean up archived saves from previous turns: keep only the last one per turn
+          _t=$(plog_begin turn-watcher "archive cleanup")
           for old_turn in $(ls "$SAVE_DIR/archived/" 2>/dev/null | sed 's/lt-game-\([0-9]*\)-.*/\1/' | sort -n | uniq); do
             [ "$old_turn" -ge "$turn" ] 2>/dev/null && continue
             ls -1t "$SAVE_DIR/archived/lt-game-${old_turn}-"*.sav.gz 2>/dev/null | tail -n +2 | xargs rm -f 2>/dev/null
           done
+          plog_end turn-watcher "archive cleanup" "$_t"
           echo "[turn-watcher] Cleaned up old archived saves"
         fi
       fi
@@ -337,8 +364,10 @@ fi
   done
   sleep 10
   echo "[auto-saver] Started — saving every 5 minutes"
+  plog auto-saver "started (interval=300s)"
   while true; do
     sleep 300
+    plog auto-saver "sending save command"
     echo "save" > /tmp/server-input 2>/dev/null
     # Wait for save to complete, then timestamp it
     sleep 5

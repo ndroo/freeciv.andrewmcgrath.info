@@ -17,6 +17,10 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib_log.sh"
+_editor_started=$(date +%s)
+plog editor "BEGIN run args=$* (pid=$$)"
+trap '_rc=$?; plog editor "END run rc=${_rc} ($(( $(date +%s) - _editor_started ))s)"' EXIT
 SAVE_DIR="${SAVE_DIR:-/data/saves}"
 DB_PATH="${DB_PATH:-$SAVE_DIR/freeciv.sqlite}"
 WEBROOT="${WEBROOT:-/opt/freeciv/www}"

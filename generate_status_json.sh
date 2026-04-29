@@ -12,6 +12,11 @@
 
 set -eu
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib_log.sh"
+_status_json_started=$(date +%s)
+plog status-json "BEGIN run (pid=$$, caller_pid=$PPID)"
+
 # ---------------------------------------------------------------------------
 # Prevent concurrent runs (cron + turn-change triggers can overlap)
 # ---------------------------------------------------------------------------
@@ -20,9 +25,12 @@ if command -v flock >/dev/null 2>&1; then
   exec 9>"$LOCKFILE"
   if ! flock -n 9; then
     echo "[status-json] Another instance is running, skipping"
+    plog status-json "SKIP: lock held by another instance"
     exit 0
   fi
 fi
+# Note: the END entry for turn-pipeline.log is emitted from cleanup() below,
+# because that trap is set AFTER this one and replaces it.
 
 # ---------------------------------------------------------------------------
 # Configuration (env vars with defaults)
@@ -60,7 +68,9 @@ done
 # ---------------------------------------------------------------------------
 TMPFILES=()
 cleanup() {
+  local _rc=$?
   rm -f "${TMPFILES[@]}" 2>/dev/null || true
+  plog status-json "END run rc=${_rc} ($(( $(date +%s) - _status_json_started ))s)"
 }
 trap cleanup EXIT
 

@@ -13,6 +13,12 @@ for arg in "$@"; do
     --to=*) TEST_TO="${arg#--to=}" ;;
   esac
 done
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib_log.sh"
+_notify_started=$(date +%s)
+plog turn-notify "BEGIN turn=${TURN} year=${YEAR} (pid=$$)"
+trap '_rc=$?; plog turn-notify "END turn=${TURN} rc=${_rc} ($(( $(date +%s) - _notify_started ))s)"' EXIT
 SES_SMTP_USER="${SES_SMTP_USER:-}"
 SES_SMTP_PASS="${SES_SMTP_PASS:-}"
 SES_SMTP_HOST="${SES_SMTP_HOST:-email-smtp.us-east-1.amazonaws.com}"

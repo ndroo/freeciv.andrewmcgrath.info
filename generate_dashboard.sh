@@ -15,6 +15,12 @@
 # =============================================================================
 set -eu
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib_log.sh"
+_dash_started=$(date +%s)
+plog dashboard "BEGIN run args=$* (pid=$$)"
+trap '_rc=$?; plog dashboard "END run rc=${_rc} ($(( $(date +%s) - _dash_started ))s)"' EXIT
+
 SAVE_DIR="/data/saves"
 REBUILD=false
 
@@ -483,7 +489,7 @@ PLAYER_COUNT=$(echo "$PLAYERS" | wc -l | tr -d ' ')
 echo "[dashboard] $PLAYER_COUNT players: $(echo $PLAYERS | tr '\n' ' ')"
 
 WORK_DIR=$(mktemp -d)
-trap "rm -rf $WORK_DIR ${TMPFILE:-}" EXIT
+trap '_rc=$?; rm -rf "'"$WORK_DIR"'" "'"${TMPFILE:-}"'"; plog dashboard "END run rc=${_rc} ($(( $(date +%s) - _dash_started ))s)"' EXIT
 
 LATEST_TURN=$(echo "$SAVE_FILES" | tail -1 | awk '{print $1}')
 TOTAL_SAVES=$(echo "$SAVE_FILES" | wc -l | tr -d ' ')
