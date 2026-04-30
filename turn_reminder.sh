@@ -12,7 +12,10 @@ SES_SMTP_HOST="${SES_SMTP_HOST:-email-smtp.us-east-1.amazonaws.com}"
 FROM_EMAIL="${FROM_EMAIL:-freeciv@andrewmcgrath.info}"
 SERVER_HOST="${SERVER_HOST:-freeciv.andrewmcgrath.info}"
 CC_EMAIL="${CC_EMAIL:-}"
-REMINDER_MARKER="/tmp/reminder-sent-turn"
+# Marker on the persistent volume so a fly deploy / container restart
+# doesn't lose it and re-send reminders to everyone (the bug that
+# caused two reminder bursts on 2026-04-30 — one per deploy that day).
+REMINDER_MARKER="/data/saves/reminder-sent-turn"
 TEST_TO=""
 DRY_RUN=""
 for arg in "$@"; do
