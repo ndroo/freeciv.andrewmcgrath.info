@@ -137,6 +137,18 @@ build_turn_context() {
   echo "$diplomacy" | jq '.current // []' > "$_tmpdir/all_dipl.json"
   echo "$recent_history" > "$_tmpdir/hist.json"
 
+  # Per-region capitals + terrain — used by the weather/augury section
+  # to write per-nation forecasts based on each capital's actual climate.
+  # Best-effort; failures degrade gracefully to an empty regions list.
+  local latest_save="$SAVE_DIR/save-latest.sav.gz"
+  local extract_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/python/bin/extract_capitals.py"
+  if [ -f "$latest_save" ] && [ -f "$extract_script" ]; then
+    python3 "$extract_script" "$latest_save" 2>/dev/null > "$_tmpdir/regions.json" \
+      || echo '{"regions":[]}' > "$_tmpdir/regions.json"
+  else
+    echo '{"regions":[]}' > "$_tmpdir/regions.json"
+  fi
+
   local context
   # The classifier def (CLASSIFY_EVENT_JQ_DEF) is concatenated at the front
   # of the jq program so `classify_event` is in scope throughout.
@@ -147,8 +159,9 @@ build_turn_context() {
     --slurpfile dipl_events "$_tmpdir/dipl_events.json" \
     --slurpfile all_dipl "$_tmpdir/all_dipl.json" \
     --slurpfile all_history "$_tmpdir/hist.json" \
+    --slurpfile regions "$_tmpdir/regions.json" \
     "$CLASSIFY_EVENT_JQ_DEF"'
-    $player_subs[0] as $player_subs | $curr[0] as $curr | $prev[0] as $prev | $dipl_events[0] as $dipl_events | $all_dipl[0] as $all_dipl | $all_history[0] as $all_history |
+    $player_subs[0] as $player_subs | $curr[0] as $curr | $prev[0] as $prev | $dipl_events[0] as $dipl_events | $all_dipl[0] as $all_dipl | $all_history[0] as $all_history | $regions[0] as $regions_data |
     {
       turn: $curr.turn,
       year: $curr.year,
@@ -248,7 +261,8 @@ build_turn_context() {
         }
       ),
 
-      player_submissions: $player_subs
+      player_submissions: $player_subs,
+      capitals: ($regions_data.regions // [])
     }')
 
   rm -rf "$_tmpdir"
@@ -266,7 +280,9 @@ generate_entry() {
 
   local system_prompt
   system_prompt=$(cat <<'SYSPROMPT'
-You are the editor-in-chief of "The Civ Chronicle", a newspaper covering a Freeciv multiplayer game. You run a real newsroom. Your reporters don't just recap what happened — they investigate, analyze, profile, predict, and provoke. Every issue should feel like a newspaper people actually want to read.
+You are the editor-in-chief of "The Civ Chronicle", a multi-page newspaper covering a Freeciv multiplayer game. You run a real newsroom. Your reporters investigate, analyze, profile, predict, and provoke. Every issue should feel like a newspaper readers actually want to flip through.
+
+YOU ARE THE EDITOR. You decide which stories matter, how the paper is laid out, what sections appear, and where images go. The structure should serve the news, not the other way around.
 
 ## Voice & era
 
@@ -281,98 +297,153 @@ Always entertaining for a modern reader — era flavor is seasoning, not a barri
 
 ## What makes good journalism
 
-DO NOT just summarize the turn's data points. That produces boring, repetitive copy. Instead:
+- **Analyze, don't summarize**: What do the numbers MEAN? Find the one or two real stories and tell them well.
+- **Use trends**: "For the third straight turn..." — trajectories, not snapshots.
+- **Speculate forward**: Who's positioned to make a move?
+- **Vary the approach AND the structure**: A blockbuster war turn should look completely different from a quiet diplomatic turn. Every edition should feel unique.
 
-- **Analyze, don't summarize**: What do the numbers *mean*? Find the one or two real stories this turn and tell them well.
-- **Use trends**: "For the third straight turn..." — show trajectories, not just snapshots.
-- **Speculate forward**: What should readers watch for? Who's positioned to make a move?
-- **Vary the approach**: One issue might profile a player. Another might investigate pollution. Don't repeat the same formula.
-
-BE CONCISE. Each section should be 1-2 short paragraphs, not feature-length articles. A tight column with one sharp insight beats three paragraphs of elaboration. Write like a newspaper with limited column inches — every sentence must earn its place.
+BE CONCISE. Sections are 1–3 short paragraphs unless the story demands more. Tight columns with one sharp insight beat three paragraphs of elaboration.
 
 ## Data available
 
-- **players**: names, nations, government types (public knowledge)
-- **totals**: aggregate world stats (cities, units, population, techs, wonders, culture, pollution, literacy)
-- **deltas**: changes since last turn (casualties, government changes, wonder/culture/pollution shifts, new cities)
-- **trends**: 5-turn rolling data for cities, units, score, pollution, culture — use these to identify trajectories
-- **notable**: computed story hooks — score spread, most warlike player, biggest casualties, underdogs, unusual government holdouts, dead players
-- **diplomacy_events / active_wars / active_alliances**: diplomatic landscape. Every event has a `category` and a `negotiated_this_turn` boolean. Also surfaced directly: `treaties_signed_this_turn` (the real deals struck THIS turn) and `automatic_transitions_this_turn` (state maturations that required no new agreement).
-- **CRITICAL — diplomacy semantics**: Freeciv has AUTOMATIC state transitions that look like signed treaties but are not. Do NOT conflate them.
-  - `peace_took_effect` (Armistice → Peace) is AUTOMATIC. The peace treaty was locked in when the cease-fire was signed many turns earlier — this is only the formal maturation. Report as "peace formally takes effect" or "longstanding armistice matures into peace", NOT as "signed a peace treaty this turn".
-  - `armistice_began` (Ceasefire → Armistice or Contact → Armistice) is AUTOMATIC.
-  - `first_contact` (Never met → anything) is not a negotiation, just a first sighting.
-  - Only events with `negotiated_this_turn: true` are deals struck this turn: `war_declared`, `ceasefire_signed`, `peace_signed` (direct — rare), `alliance_formed`.
-  - When tallying player activity ("X signed Y treaties this turn"), count ONLY from `treaties_signed_this_turn`. Do not add automatic transitions or first contacts to that count. Do not attribute another pair's deal to a player uninvolved in it.
-- **public_events**: wonder completions, revolts, city foundings
-- **wonder_holders / spaceship_progress / culture_leaders**: achievement data
-- **player_submissions**: Correspondence between the editor and in-game leaders. Includes player messages and editor replies, with a `pub_status` field showing whether each was already published (e.g. "Published in edition 99") or "Not yet published". You have FULL editorial discretion to quote, paraphrase, or reference any material. Treat player messages as on-the-record statements from public figures. Prefer unpublished material — avoid re-quoting things already published in a previous edition unless following up on a story. Weave the best material into articles naturally. Not everything needs to be used.
-- **recent_headlines**: Headlines from the last ~5 editions. Use this to avoid rehashing stories that were already covered. If something was a headline 2 turns ago, it is NOT news anymore unless there is a genuinely new development in THIS turn's data (a new diplomacy_event, a new public_event, a new delta).
+- **players** (names, nations, governments — public)
+- **totals** (cities, units, population, techs, wonders, culture, pollution, literacy)
+- **deltas** (changes since last turn)
+- **trends** (5-turn rolling data)
+- **notable** (computed story hooks — score spread, warlike, casualties, underdogs)
+- **diplomacy_events / active_wars / active_alliances**, with `negotiated_this_turn` flag.
+- **CRITICAL — diplomacy semantics**: Freeciv has AUTOMATIC state transitions that look like signed treaties but are not. `peace_took_effect`, `armistice_began`, `first_contact` are AUTOMATIC. Only events with `negotiated_this_turn: true` are real deals struck this turn (`war_declared`, `ceasefire_signed`, `peace_signed`, `alliance_formed`). When counting player activity, count only `treaties_signed_this_turn`.
+- **public_events** (wonders, revolts, city foundings)
+- **wonder_holders / spaceship_progress / culture_leaders**
+- **player_submissions**: real correspondence with players. `pub_status` shows whether each was published before. You have FULL editorial discretion. Prefer unpublished material.
+- **recent_headlines** + **recent_section_kinds**: the previous editions' shape and stories. **Do NOT use the same section lineup as the previous edition.** Pick a different shape — let the news of THIS turn dictate which sections appear.
 
 ## Information rules
 
-- **PUBLIC** (report freely): diplomacy, wars, alliances, government types, aggregate totals, wonder completions, combat casualties, city foundings, rankings, nations, spaceship progress, who holds wonders, government changes, trends
-- **PRIVATE** (never reveal): per-player gold, per-player unit counts or compositions, per-player tech counts, research targets, city production, per-player happiness/literacy/pollution
-- Fictional quotes from in-game player leaders are encouraged — they are public figures being quoted by the press. But use them where they serve the story, not as a formula. Some stories need quotes; some are better without them.
-- **Player-nation cross-referencing**: On first mention of a player in each section, naturally include their nation (e.g. "Shogun of the English", "Kroony, the Atlantean chieftain"). On first mention of a nation, include the player name (e.g. "the English, led by Shogun"). Do this naturally within the prose — do NOT use parenthetical annotations like "Shogun (English)". After the first mention in a section, just use whichever name fits.
+- **PUBLIC** (report freely): diplomacy, wars, alliances, government types, aggregate totals, wonder completions, combat casualties, city foundings, rankings, nations, spaceship progress, government changes, trends.
+- **PRIVATE** (never reveal): per-player gold, per-player unit counts or compositions, per-player tech counts, research targets, city production, per-player happiness/literacy/pollution.
+- Fictional quotes from leaders are encouraged when they serve the story.
+- Cross-reference player ↔ nation naturally on first mention ("Shogun of the English"). After that use whichever fits.
 
-## Structure
+## Output structure (schema_version 2)
 
-The newspaper has these sections, but you have FULL editorial control over their weight and focus:
+The paper is **2 pages typically, 1 if news is sparse, 3–4 for major occasions** (war declarations, deaths, anniversaries). YOU choose. Each page is an array of sections. YOU choose which kinds and in what order.
 
-- **Front Page**: The ONE story that matters most, told in 2-3 tight paragraphs. Not a summary of everything.
-- **Economy**: 1-2 paragraphs. One insight about the economic situation — inequality, governance, pollution, whatever's interesting.
-- **Military**: 1-2 paragraphs. The balance of power, who's fighting, what it means.
-- **Society**: 1-2 paragraphs. Culture, science, the human side.
-- **Opinion Column**: 2-3 paragraphs IN THE VOICE of a real historical figure alive at the game year. Must faithfully reproduce their actual writing style. React to specific events, not generic philosophy.
-- **Letters to the Editor**: 2-3 SHORT letters (2-3 sentences each) from fictional citizens. Each letter MUST be written by a citizen of a specific player's nation, from a plausible city in that civilization (e.g. "Ottawa, Canada" or "Tokyo, Japan" or "Valletta, Malta"). The letter should reflect that citizen's lived experience under their government — a farmer in a communist state has different complaints than a merchant in a democracy. Reference specific events affecting their nation.
-- **Classifieds**: 3-6 classified ads (vary the number each issue). These should read like REAL classified ads from a newspaper of the game's current era — not jokes with punchlines, but genuinely plausible ads that happen to be funny because of the game context. Each ad MUST include era-appropriate contact info (ancient: "inquire at the eastern gate" / medieval: "send word to the guild hall on Bridge Street" / modern: "call 555-0142" or "email jobs@company.com" or a PO Box). Include prices, quantities, locations, requirements. Some categories: jobs/help wanted, real estate, goods for sale, services, lost & found, personals, legal notices. Plain text only, no HTML tags.
+### REQUIRED in every edition
+Every edition MUST include AT LEAST one of each of:
+- `letters` — letters to the editor (always; 2–3 letters; they're the heart of the paper)
+- `puzzle` — a crossword (always; readers expect it)
+- `ads` — classifieds with EXACTLY 6 entries (the funniest section, never skip it)
 
-Every section gets an era-appropriate byline. Keep the same reporters across issues.
+These three are non-negotiable. They typically live on the last page.
+
+### Page composition advice
+Aim for **3–5 sections per page** with a visual mix of full-width pieces (lead, breaking, puzzle, letters, ads) and column-pieces (column/feature/society/etc.). The renderer arranges columns in a 2-up grid, so pair them so adjacent columns are roughly the same length. Don't generate so many sections that pages end up sparse.
+
+Available section kinds (use the ones that fit the news — don't force every kind into every edition):
+
+- `lead` — the splash story at the top of page 1. Almost every edition has one. {title, byline, content, lead_image_id?}
+- `column` — focused analysis on one topic (Economy, Military, Society…). 0–3 per edition. {title, byline, content, lead_image_id?}
+- `feature` — longer profile or investigative piece. {title, byline, content}
+- `opinion` — op-ed in voice of a REAL historical figure alive at the game year. {author, author_title, title, content}
+- `interview` — quote-driven piece on one player. Use when a player is doing something genuinely interesting. {subject, byline, content}
+- `letters` — letters to the editor. {items: [{from, title?, body}]}
+- `obituary` — a player has died, or a great city has fallen. RARE. {title, content}
+- `looking_back` — retrospective: today's events parallel an earlier turn, or it's an anniversary edition. Use only when there is a real parallel. {title, content}
+- `dispatch` — foreign-correspondent angle from one nation. {title, byline, content}
+- `breaking` — small high-priority sidebar (1 paragraph, wire-service style). {title, content}
+- `puzzle` — REQUIRED in every edition. Almost always a crossword (the renderer builds the grid for you):
+   - `{ "type": "crossword", "title": "...", "entries": [{"word": "BRONZE", "clue": "Hard alloy..."}, ...] }` — give 8–12 entries, words 3–9 letters, ALL CAPS, no spaces or punctuation. The renderer fits them into a real intersecting grid client-side, so make sure several words share letters (otherwise placement fails and they're dropped from the grid). Clues should be era-appropriate AND reference real game-state from this turn (player names, nations, recent events) — that's what makes it fun.
+   - **CRITICAL — no repeats**: the context provides `recent_crossword_words` listing every word used in any prior edition's crossword. **Every word in `entries` must NOT appear in `recent_crossword_words`.** Crosswords get stale fast when the same answers (BRONZE, CHARIOT, OATH, RIVER) come back turn after turn. Reach for fresher answers — domain-specific terms tied to *this* turn's events. If you genuinely can't avoid 1-2 reuses, prefer rephrasing the clue to give the same word a different angle.
+   - **CRITICAL — real names**: when referencing in-game places or things, use the player-chosen names from the `capitals` array (e.g. if DetectiveG's Ecuadorian capital is "Fuck Off!!!" then that is the city, NOT "Quito" — don't fall back to real-world geography). Same for nations and players: use exactly the names you see in the context.
+   - Occasionally vary with `{ "type": "cipher", "title": "...", "cipher_text": "WKLV LV D PHVVDJH", "hint": "Caesar shift, key 3" }` for a change of pace, but the crossword is the default.
+- `sports` — era-appropriate athletics (ancient foot races → chariot races → jousting → fencing → modern sports). {title, byline?, report?, results:[{match, outcome}]}
+- `weather` (or `augury`) — era-styled forecast page. Always slightly absurd. Schema (use any combination of these — `regions` is the showpiece, the rest are supplementary):
+   - `label` — section title (e.g. "The Augur's Forecast — 1450 BC")
+   - `forecast` — one poetic headline forecast line (the "tomorrow's weather: war" tone)
+   - `regions` — **the headline feature**: per-nation weather grounded in each capital's actual terrain. Schema: `[{ "nation": "Australian", "capital": "Sydney", "terrain": "Plains", "icon": "☀️", "forecast": "Hot wind off the inland sea, scribes complain.", "omen": "Locusts sighted east." }]`. The `capitals` array in the context gives you each player's capital + terrain ground-truth — use it. **Pick exactly 3 OR exactly 6 nations** (the renderer is a 3-column grid, so 3 = one row, 6 = two rows; any other count leaves empty cells). Choose the most newsworthy this turn: war participants, score leaders, anyone whose weather ties to a current storyline, plus 1-2 underdog/atmospheric picks for colour. Rotate the selection across editions so different nations get the spotlight over time. Pick `icon` from: ☀️ ⛅ ☁️ 🌧️ ⛈️ 🌪️ ❄️ 🌨️ 🌫️ 🌬️ 🦗 🔥 🌊 🌋 ☄️ 🌑 — match the climate (desert→☀️, tundra→❄️, jungle→🌧️, war zone→🔥, etc.). Forecast lines should be SHORT — one tight sentence each. `omen` is optional and even shorter. **Use the player-chosen capital names verbatim** from the `capitals` array — never substitute real-world geography (e.g. "Quito" for whatever the Ecuadorian player actually named their city).
+   - `outlooks` — array of 2–4 world-wide hazard watches with severity: `[{ "kind": "flood", "level": "moderate", "note": "Tigris swells" }, { "kind": "locust", "level": "watch", "note": "Swarm beyond Ur" }]`. Valid `level`: `low | moderate | watch | severe`. `kind` is short (1-2 words, era-appropriate: flood, fire, locust, plague, frost, drought, dust storm, eclipse, comet, etc.). `note` is one short sentence. Hazards should track real game events when possible (war = "war smoke severe", lots of unsettled tiles = "drought watch", etc.).
+   Make the section feel like a real almanac page — short, slightly ominous, era-true. The per-region grid is the most interesting part because it ties the weather to the actual game map.
+- `lottery` — auspicious numbers / temple readings. {label, numbers:[5 ints], note?}
+- `marketplace` — commodity prices ledger. {title, items:[{commodity, price}]}
+- `rumour_mill` — 3–5 one-line gossip snippets. {content with <p> per line}
+- `etiquette` — era-appropriate manners column. {title, byline, content}
+- `serial_fiction` — continuing story across editions. {title, byline, content}
+- `image` — standalone visual block. {image_id, size: "full|half|aside"}
+- `corrections` — usually last on the final page. {content}
+- `ads` — classifieds. Usually last on the final page. {items:[strings]}
+
+Recurring features (sports, weather, lottery, puzzle, marketplace) are an opportunity to give the paper personality without requiring big news. Rotate them — not every edition has every recurring section.
+
+## Images
+
+You may include up to **6 images**, typically 2–3. The image generator (Gemini) makes one image per `images[]` entry from your prompt. Each image gets:
+- `id` (your label, e.g. "im1")
+- `prompt` — concrete visual scene. ONE specific moment, one or two subjects, identifiable action and setting. BAD: "a nation at a crossroads". GOOD: "Two robed envoys shake hands across a stone table as scribes record the peace".
+- `caption` — what runs underneath, like a real newspaper photo caption.
+- `credit` — era-appropriate medium (carving / engraving / woodcut / photograph).
+
+Then place the image in the layout via:
+- `lead_image_id` on a section → hero image at the top of that section
+- `{{img:id}}` token inside a section's `content` HTML → inline figure at that exact spot
+- A standalone `{kind: "image", image_id: "imN", size: "full|half|aside"}` section → striking single-image block
+
+Only generate an image if there is a concrete scene worth showing. A talky diplomatic edition might use only 1; a war edition might use 4.
+
+## Classifieds
+
+Era-appropriate. Real-classifieds-with-context, not punchlines. Each ad needs era-appropriate contact info (ancient: "inquire at the eastern gate" / medieval: "send word to the guild hall on Bridge Street" / modern: "call 555-0142"). Plain text, no HTML.
 
 ## Continuity
 
-When given a PREVIOUS issue:
-- Keep the same reporter staff (or explain departures)
-- Follow up on previous stories ONLY if there is new data to report (a new event, a meaningful stat change, a new player message). Do not rehash or re-announce something that was already a headline.
-- Issue corrections when past speculation proved wrong (be funny about it)
-- Build running narratives — the space race, a rivalry, an underdog's rise
-- Check recent_headlines: if a story was already headlined, find a DIFFERENT angle or a different story entirely. Every edition needs fresh news.
+When given a PREVIOUS issue (`previous_issue` in context) and `recent_headlines`:
+- Keep the same reporter staff. Recurring bylines (Mira Vance, Naram-Ettu, etc.) build the paper's identity over time.
+- Follow up on previous stories ONLY if there's new data. Don't re-announce yesterday's headline.
+- Issue corrections when past speculation proved wrong (be funny about it).
+- Build running narratives — a space race, a rivalry, an underdog's rise.
 
 ## Headline
 
-Punchy, dramatic, like a real newspaper front page. Do NOT include turn number or year — those are in the masthead.
+Punchy, dramatic. Do NOT include turn number or year — those are in the masthead.
 
 ## Output format
 
-Return JSON with this exact structure:
+Return JSON with EXACTLY this top-level shape:
+
 {
+  "schema_version": 2,
   "headline": "...",
-  "sections": {
-    "front_page": {"byline": "reporter name and title", "content": "..."},
-    "economy": {"byline": "reporter name and title", "content": "..."},
-    "military": {"byline": "reporter name and title", "content": "..."},
-    "society": {"byline": "reporter name and title", "content": "..."}
-  },
-  "opinion": {
-    "author": "real historical figure alive at the game year",
-    "author_title": "their real title",
-    "title": "column title",
-    "content": "..."
-  },
-  "letters": [
-    {"author": "citizen name, role, city, nation", "content": "..."},
-    {"author": "citizen name, role, city, nation", "content": "..."}
+  "edition_label": null,           // optional banner like "Anniversary Issue" — usually null
+
+  "images": [                      // 0–6 images (2–3 typical)
+    { "id": "im1", "prompt": "...", "caption": "...", "credit": "..." }
   ],
-  "ads": ["classified ad 1", "classified ad 2", "...(3-6 total, vary each issue)"],
-  "corrections": "correction text or null",
-  "illustration_caption": {
-    "credit": "credit line as it would appear in a newspaper of this era (e.g. 'Photograph by Dorothea Lange, AP'). Use the era-appropriate medium (carving/painting/engraving/photograph). Do NOT use words like 'period' or 'era' or 'ancient'. This is a newspaper from THAT day.",
-    "description": "A single concrete visual scene for the illustrator that DIRECTLY depicts the lead story from the front page — one specific moment, one or two subjects, with identifiable action and setting. BAD examples: 'the aftermath of the armistice', 'a nation at a crossroads', 'the tension between empires' (too abstract). GOOD examples: 'A Viking scout on horseback traces a forest border at dusk, mapping the Atlantean frontier', 'Two robed envoys shake hands across a stone table as scribes record the peace', 'Kroony's scouts discover a North Korean explorer charting their interior forests'. Name specific subjects/places when relevant. No text or words will appear in the image."
-  }
+
+  "pages": [                       // **3–5 pages — never more.** Aim for 4.
+    {
+      "page_number": 1,
+      "sections": [
+        { "kind": "lead", "title": "...", "byline": "...", "lead_image_id": "im1", "content": "<p>...</p>" }
+        // ... more sections in order
+      ]
+    }
+    // ... more pages
+  ]
 }
 
-All content fields should use simple HTML (<p>, <strong>, <em>) for formatting.
+All `content` strings use simple HTML (<p>, <strong>, <em>). No <script>, no <img> (use the image system).
+
+## Page balance — VERY IMPORTANT
+
+Pages are rendered as a printed broadsheet whose height locks to the TALLEST page. A short page next to a tall page leaves dead whitespace, which looks unprofessional. Therefore:
+
+- **Aim for 3–5 pages** total. Four is the sweet spot. Six or seven pages of thin content reads as padding.
+- Each page should hold **roughly the same amount of text** as its siblings. Don't put a giant lead + tiny page-2.
+- Single-column sections will pair into rows of two — so each page should have either a span-all section (lead/breaking/puzzle/letters/ads/corrections) or an EVEN number of single-col sections (column/feature/dispatch/opinion/interview), so no row ends up half-empty.
+- The weather/augury section is full-width when it has `regions[]` — it tends to be tall, so put it on a page where it's the dominant feature with maybe one short partner.
+- Recurring features (sports, marketplace, lottery, weather) on the LAST page should NOT each get their own page. Combine 2–3 onto one page.
+
+You can experiment with section kinds beyond the documented list — the renderer falls back to a generic prose block for unknown kinds. But prefer the documented kinds when they fit.
 SYSPROMPT
 )
 
@@ -393,40 +464,55 @@ ${prev_issue}"
   local request_body response content
 
   if [ "$GAZETTE_PROVIDER" = "anthropic" ]; then
-    local _tmpsys=$(mktemp) _tmpusr=$(mktemp)
+    local _tmpsys=$(mktemp) _tmpusr=$(mktemp) _tmpout=$(mktemp)
     printf '%s' "$system_prompt" > "$_tmpsys"
     printf '%s' "$user_prompt" > "$_tmpusr"
-    request_body=$(jq -n \
-      --rawfile system "$_tmpsys" \
-      --rawfile user "$_tmpusr" \
-      '{
-        model: "claude-opus-4-6",
-        max_tokens: 8000,
-        system: $system,
-        messages: [
-          {role: "user", content: $user}
-        ],
-        temperature: 0.9
-      }')
-    rm -f "$_tmpsys" "$_tmpusr"
 
-    local _tmpbody=$(mktemp)
-    echo "$request_body" > "$_tmpbody"
-    response=$(curl -s --max-time 120 \
-      -H "x-api-key: $ANTHROPIC_API_KEY" \
-      -H "anthropic-version: 2023-06-01" \
-      -H "Content-Type: application/json" \
-      -d "@$_tmpbody" \
-      "https://api.anthropic.com/v1/messages")
-    rm -f "$_tmpbody"
-
-    content=$(echo "$response" | jq -r '.content[0].text // empty')
-
-    if [ -z "$content" ]; then
-      echo "[gazette] Anthropic call failed for turn $turn" >&2
-      echo "$response" | jq . >&2 2>/dev/null || echo "$response" >&2
+    # Use the streaming Python helper so the user sees live token/sec
+    # progress on stderr instead of 2-3 minutes of dead air. The helper
+    # writes the assembled text to stdout; bash captures that into
+    # `content`. Stderr is left attached to the terminal.
+    local _helper
+    _helper="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/python/bin/anthropic_complete.py"
+    if [ ! -x "$_helper" ]; then
+      echo "[gazette] ERROR: streaming helper not found at $_helper" >&2
+      rm -f "$_tmpsys" "$_tmpusr" "$_tmpout"
       return 1
     fi
+
+    local sys_size usr_size
+    sys_size=$(wc -c < "$_tmpsys" | tr -d ' ')
+    usr_size=$(wc -c < "$_tmpusr" | tr -d ' ')
+    echo "[gazette] Calling Anthropic (model=claude-opus-4-6, system=${sys_size}B user=${usr_size}B)..." >&2
+
+    local _t0 _elapsed _exit
+    _t0=$(date +%s)
+    if ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" python3 "$_helper" \
+         --model claude-opus-4-6 \
+         --max-tokens 8000 \
+         --temperature 0.9 \
+         "$_tmpsys" "$_tmpusr" > "$_tmpout"; then
+      _exit=0
+    else
+      _exit=$?
+    fi
+    _elapsed=$(($(date +%s) - _t0))
+    rm -f "$_tmpsys" "$_tmpusr"
+
+    if [ "$_exit" -ne 0 ]; then
+      echo "[gazette] Anthropic helper failed (exit $_exit) for turn $turn after ${_elapsed}s" >&2
+      rm -f "$_tmpout"
+      return 1
+    fi
+
+    content=$(cat "$_tmpout")
+    rm -f "$_tmpout"
+
+    if [ -z "$content" ]; then
+      echo "[gazette] Anthropic returned empty content for turn $turn" >&2
+      return 1
+    fi
+    echo "[gazette] Got ${#content} chars of content from Anthropic in ${_elapsed}s" >&2
 
     # Claude may wrap JSON in markdown code fences — strip them
     content=$(echo "$content" | sed '/^```json$/d' | sed '/^```$/d')
@@ -467,8 +553,39 @@ ${prev_issue}"
     fi
   fi
 
-  # Validate it's JSON with expected fields
-  if ! echo "$content" | jq -e '.headline and .sections and .opinion and .letters' >/dev/null 2>&1; then
+  # Validate v2 structural integrity (not content correctness — unknown
+  # section kinds are intentionally allowed). If schema_version != 2 we
+  # accept it as legacy v1 if it has `sections` (some prompts may slip).
+  local validation_ok=false
+  if echo "$content" | jq -e '.schema_version == 2 and (.headline | length > 0) and (.pages | type == "array") and (.pages | length > 0) and (.pages | all(.sections | type == "array"))' >/dev/null 2>&1; then
+    # Image cap (≤ 6) and inline-token resolution check
+    local img_count token_unresolved
+    img_count=$(echo "$content" | jq '.images // [] | length')
+    if [ "$img_count" -gt 6 ] 2>/dev/null; then
+      echo "[gazette] Validation failed: $img_count images (max 6)" >&2
+    else
+      # Confirm every {{img:id}} and lead_image_id has a matching image entry.
+      token_unresolved=$(echo "$content" | jq -r '
+        (.images // []) | map(.id) as $ids |
+        [
+          (.. | objects | select(has("lead_image_id")) | .lead_image_id),
+          (.. | strings | scan("\\{\\{img:([a-z0-9_-]+)\\}\\}") | .[0])
+        ] | flatten | map(select(. != null and (. as $i | $ids | index($i) == null)))
+        | unique | join(",")
+      ')
+      if [ -n "$token_unresolved" ]; then
+        echo "[gazette] Validation failed: unresolved image refs: $token_unresolved" >&2
+      else
+        validation_ok=true
+      fi
+    fi
+  elif echo "$content" | jq -e '.headline and .sections and .opinion and .letters' >/dev/null 2>&1; then
+    # v1 legacy fallback — old prompts or model regression. Accept it.
+    echo "[gazette] Note: model returned v1-style response (no schema_version=2)" >&2
+    validation_ok=true
+  fi
+
+  if [ "$validation_ok" != "true" ]; then
     echo "[gazette] Invalid response format for turn $turn" >&2
     echo "$content" >&2
     return 1
@@ -478,47 +595,220 @@ ${prev_issue}"
 }
 
 # ---------------------------------------------------------------------------
-# Generate a front-page illustration using Gemini image generation
+# Era-appropriate art-style pool. Each era returns a multi-line list of
+# distinct media options. The image generator picks one per image at
+# random so a single edition doesn't end up with three identical
+# orange tablets.
+#
+# Crucially every entry says the work is FRESHLY MADE with vivid
+# pigments — the weathered-orange aesthetic that dominates AI Bronze-Age
+# imagery is millennia of fade, not how the originals actually looked.
+# We want to depict the world AT the year, not as we'd find its
+# artefacts in a museum today.
 # ---------------------------------------------------------------------------
-generate_illustration() {
-  local headline="$1"
-  local year="$2"
-  local target_turn="$3"
-  local front_page_text="$4"
-  local art_credit="$5"
-  local illustration_desc="$6"
+_art_styles_for_year() {
+  local year="$1"
+  if [ "$year" -lt -1000 ] 2>/dev/null; then
+    cat <<'EOF'
+freshly-painted Egyptian limestone relief, vivid pigments — lapis blue, malachite green, ochre, gold leaf — as if the carvers laid down their brushes yesterday
+brilliantly painted Mesopotamian fresco on plastered mud-brick walls, bold geometric borders in red, blue, and white, figures in profile
+glazed terracotta cylinder seal impression rolled out on wet clay, ochre and cream tones, fine miniature figures
+gold and lapis votive statuette of a god or king, lit from above, against a deep black void, polished metal sheen
+painted Egyptian tomb-wall scene, freshly applied pigment, figures in strict profile, hieroglyphs above and below, every colour vivid
+glazed-brick Mesopotamian palace panel, blue field with white striding lions and rosettes, just-fired and gleaming
+EOF
+  elif [ "$year" -lt 500 ] 2>/dev/null; then
+    cat <<'EOF'
+classical Greek red-figure pottery scene, terracotta and black, intricate fine-line drawing
+Roman fresco from a freshly-plastered villa wall, rich red ochre, deep blacks, vivid figures and architectural details
+Hellenistic marble statue, freshly carved white marble against a soft neutral backdrop, dramatic chiaroscuro
+Byzantine mosaic, golden tesserae background, robed figures in jewel tones
+late Roman wall painting in vibrant earth tones, garden or banquet scene
+painted Greek terracotta votive figure, brightly coloured at the moment of dedication
+EOF
+  elif [ "$year" -lt 1400 ] 2>/dev/null; then
+    cat <<'EOF'
+medieval illuminated manuscript page, freshly painted gold leaf and lapis blue on parchment, marginal grotesques
+Norman tapestry panel, embroidered figures in earthy wool tones, just off the loom
+stained-glass window scene, jewel tones and lead lines, sunlight streaming through
+ivory carved diptych, white relief on dark background, intricate figures
+Romanesque cathedral fresco, freshly painted, bold colours and elongated figures
+heraldic banner, freshly dyed in saturated colours, rampant lions and crosses
+EOF
+  elif [ "$year" -lt 1800 ] 2>/dev/null; then
+    cat <<'EOF'
+Renaissance oil painting, chiaroscuro lighting, rich figures, freshly varnished
+Renaissance woodcut engraving, fine cross-hatching on cream paper, just pulled from the press
+copper etching, fine line work, deep blacks, sharp impression
+Dutch golden-age genre scene, oil on panel, candlelit interior
+hand-coloured engraved map page, vivid borders and cartouches
+Baroque fresco ceiling fragment, swirling figures and clouds, freshly painted
+EOF
+  elif [ "$year" -lt 1900 ] 2>/dev/null; then
+    cat <<'EOF'
+19th-century lithograph, soft tonal gradient, single-page editorial scene
+sepia daguerreotype, formal portrait or scene, soft focus
+hand-coloured engraving, vivid hues, scientific or topographical subject
+political cartoon in pen and ink, vintage newspaper style
+chromolithograph poster, bold flat colours, dramatic typography excluded
+EOF
+  else
+    cat <<'EOF'
+black-and-white press photograph, gritty mid-century newsprint feel, candid moment
+modern editorial illustration, pen and ink with crosshatched shading
+documentary colour photograph, candid moment, bold composition
+1950s editorial cartoon in heavy black ink
+modern news photo with grainy halftone reproduction
+contemporary photojournalism — sharp focus, natural light, single subject in motion
+EOF
+  fi
+}
 
-  # API key: env var > .env file > file in save dir
-  local api_key="${GEMINI_API_KEY:-}"
-  if [ -z "$api_key" ] && [ -f "$SCRIPT_DIR/.env" ]; then
-    api_key=$(grep '^GEMINI_API_KEY=' "$SCRIPT_DIR/.env" | head -1 | sed 's/^GEMINI_API_KEY=//' | tr -d '[:space:]"'"'")
+# ---------------------------------------------------------------------------
+# Look up the Gemini API key (env > .env > save dir file). Empty stdout
+# if no key found.
+# ---------------------------------------------------------------------------
+_gemini_api_key() {
+  local k="${GEMINI_API_KEY:-}"
+  if [ -z "$k" ] && [ -f "$SCRIPT_DIR/.env" ]; then
+    k=$(grep '^GEMINI_API_KEY=' "$SCRIPT_DIR/.env" | head -1 | sed 's/^GEMINI_API_KEY=//' | tr -d '[:space:]"'"'")
   fi
-  if [ -z "$api_key" ] && [ -f "$SAVE_DIR/gemini_api_key" ]; then
-    api_key=$(cat "$SAVE_DIR/gemini_api_key" | tr -d '[:space:]')
+  if [ -z "$k" ] && [ -f "$SAVE_DIR/gemini_api_key" ]; then
+    k=$(cat "$SAVE_DIR/gemini_api_key" | tr -d '[:space:]')
   fi
-  if [ -z "$api_key" ]; then
-    echo "[gazette] No Gemini API key found, skipping illustration" >&2
+  echo "$k"
+}
+
+# ---------------------------------------------------------------------------
+# Single Gemini image call. $1 = full prompt string, $2 = output filename
+# (no path). Writes to $SAVE_DIR/$2 + symlinks into webroot. Returns 0 on
+# success (filename echoed to stdout), 1 on failure (error to stderr).
+# ---------------------------------------------------------------------------
+_gemini_generate_one() {
+  local prompt="$1" out_basename="$2" aspect="${3:-16:9}"
+  local api_key
+  api_key=$(_gemini_api_key)
+  [ -z "$api_key" ] && { echo "[gazette] No Gemini API key" >&2; return 1; }
+
+  local request_body response image_data
+  request_body=$(jq -n --arg prompt "$prompt" --arg ar "$aspect" '{
+    contents: [{ parts: [{text: $prompt}] }],
+    generationConfig: {
+      responseModalities: ["Text", "Image"],
+      temperature: 0.8,
+      imageConfig: { imageSize: "1K", aspectRatio: $ar }
+    }
+  }')
+  response=$(curl -s --max-time 60 \
+    -H "x-goog-api-key: $api_key" \
+    -H "Content-Type: application/json" \
+    -d "$request_body" \
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent")
+  image_data=$(echo "$response" | jq -r '.candidates[0].content.parts[] | select(.inlineData) | .inlineData.data // empty' 2>/dev/null | head -1)
+
+  if [ -z "$image_data" ]; then
+    echo "[gazette] Gemini failed for $out_basename" >&2
+    echo "$response" | jq -r '.error.message // empty' >&2 2>/dev/null
     return 1
   fi
+  echo "$image_data" | base64 -d > "$SAVE_DIR/$out_basename"
+  ln -sf "$SAVE_DIR/$out_basename" "$WEBROOT/$out_basename" 2>/dev/null || true
+  echo "$out_basename"
+}
 
-  # Pick art style based on era
-  local art_style
-  if [ "$year" -lt -1000 ] 2>/dev/null; then
-    art_style="ancient Mesopotamian/Egyptian stone relief carving style, carved into sandstone, hieroglyphic border elements"
-  elif [ "$year" -lt 500 ] 2>/dev/null; then
-    art_style="classical Greek/Roman mosaic or red-figure pottery style, terracotta and black tones"
-  elif [ "$year" -lt 1400 ] 2>/dev/null; then
-    art_style="medieval illuminated manuscript style, gold leaf accents, rich colors on parchment"
-  elif [ "$year" -lt 1800 ] 2>/dev/null; then
-    art_style="Renaissance woodcut engraving style, fine black ink crosshatching on cream paper"
-  else
-    art_style="vintage newspaper editorial illustration, pen and ink sketch style, crosshatched shading"
+# ---------------------------------------------------------------------------
+# v2 multi-image driver. Reads `entry.images[]`, generates each image in
+# parallel (cap of 2 concurrent), writes the resulting filenames back into
+# the entry as `images[i].file`. Failures are non-fatal — a missing file
+# just renders as the typeset "(Photo unavailable)" placeholder.
+#
+# Args:
+#   $1  the entry JSON
+#   $2  target turn (for filenames)
+#   $3  game year (for art-style preamble)
+# Echoes the (possibly mutated) entry JSON to stdout.
+# ---------------------------------------------------------------------------
+generate_images_for_entry() {
+  local entry="$1" turn="$2" year="$3"
+  local n_images
+  n_images=$(echo "$entry" | jq '.images // [] | length')
+  [ "$n_images" -eq 0 ] && { echo "$entry"; return 0; }
+  echo "[gazette] Generating $n_images image(s) via Gemini (max 2 concurrent)..." >&2
+  local _t0_img
+  _t0_img=$(date +%s)
+
+  # Cache the era's full style pool once; we'll pick a different one
+  # per image so a single edition shows visual variety (a fresco, a
+  # statuette, and a painted relief — not three identical tablets).
+  local style_pool
+  style_pool=$(_art_styles_for_year "$year")
+
+  # Build the per-image prompt + dispatch up to 2 concurrent jobs.
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  local i=0 max_concurrent=2 running=0
+  while [ "$i" -lt "$n_images" ]; do
+    local img id prompt out_basename art_style aspect aspect_word
+    img=$(echo "$entry" | jq -c ".images[$i]")
+    id=$(echo "$img" | jq -r '.id')
+    art_style=$(printf '%s\n' "$style_pool" | shuf -n 1)
+    # Per-image aspect ratio. AI can request "wide" (16:9, default — best
+    # for hero/lead images), "tall" (3:4 — for inline-floated portraits),
+    # or "square" (1:1 — for icon-like images). Defaults to wide so
+    # images don't dominate the page vertically the way 1:1 squares do.
+    aspect=$(echo "$img" | jq -r '.aspect // "wide"')
+    case "$aspect" in
+      tall)   aspect="3:4";   aspect_word="tall portrait" ;;
+      square) aspect="1:1";   aspect_word="square" ;;
+      wide|*) aspect="16:9";  aspect_word="wide landscape" ;;
+    esac
+    prompt="A single newspaper editorial illustration. Medium: ${art_style}. Scene: $(echo "$img" | jq -r '.prompt'). Focus on the specific subjects and action — this is not a generic era scene, it is an image of this exact moment in this exact place. The work is being created NOW (in the era depicted), not viewed centuries later — colours are vivid and fresh. No text, letters, or words anywhere in the image. ${aspect_word^} ${aspect} aspect ratio, detailed."
+    out_basename="gazette-${turn}-${id}.png"
+    (
+      result=$(_gemini_generate_one "$prompt" "$out_basename" "$aspect" 2>>"$tmpdir/errors.log") && \
+        echo "$id $result" > "$tmpdir/$id.ok"
+    ) &
+    running=$((running + 1))
+    i=$((i + 1))
+    if [ "$running" -ge "$max_concurrent" ]; then
+      wait -n 2>/dev/null || wait
+      running=$((running - 1))
+    fi
+  done
+  wait
+
+  # Merge results back into entry.images[].file.
+  local id basename
+  for okfile in "$tmpdir"/*.ok; do
+    [ -f "$okfile" ] || continue
+    id=$(awk '{print $1}' "$okfile")
+    basename=$(awk '{print $2}' "$okfile")
+    entry=$(echo "$entry" | jq --arg id "$id" --arg f "$basename" '
+      .images = (.images | map(if .id == $id then .file = $f else . end))
+    ')
+  done
+
+  if [ -s "$tmpdir/errors.log" ]; then
+    cat "$tmpdir/errors.log" >&2
   fi
+  local _ok_count
+  _ok_count=$(ls "$tmpdir"/*.ok 2>/dev/null | wc -l | tr -d ' ')
+  rm -rf "$tmpdir"
+  echo "[gazette] Image generation done in $(($(date +%s) - _t0_img))s ($_ok_count/$n_images succeeded)" >&2
+  echo "$entry"
+}
 
-  # Build the scene prompt. Lead with the headline + AI-supplied concrete scene
-  # description; only fall back to front-page prose if the scene description is
-  # missing. Including the full front-page text dilutes the focus and often
-  # produces generic, off-topic images.
+# ---------------------------------------------------------------------------
+# v1 single-illustration helper. Kept for v1-style fallback when the model
+# returns the legacy schema. Calls _gemini_generate_one under the hood.
+# ---------------------------------------------------------------------------
+generate_illustration() {
+  local headline="$1" year="$2" target_turn="$3" front_page_text="$4"
+  local art_credit="$5" illustration_desc="$6"
+
+  local art_style
+  art_style=$(_art_styles_for_year "$year" | shuf -n 1)
+
   local artist_style=""
   if [ -n "$art_credit" ]; then
     artist_style="In the style described by: ${art_credit}. "
@@ -534,46 +824,8 @@ generate_illustration() {
 
   local prompt="A single newspaper editorial illustration depicting the scene below. ${artist_style}Style: ${art_style}. ${scene_desc} Focus on the specific subjects and action — this is not a generic era scene, it is an image of this exact moment. No text, letters, or words anywhere in the image. Square format, detailed."
 
-  local request_body
-  request_body=$(jq -n \
-    --arg prompt "$prompt" \
-    '{
-      contents: [{
-        parts: [{text: $prompt}]
-      }],
-      generationConfig: {
-        responseModalities: ["Text", "Image"],
-        temperature: 0.8,
-        imageConfig: {
-          imageSize: "1K"
-        }
-      }
-    }')
-
   echo "[gazette] Generating illustration for turn $target_turn..." >&2
-  local response
-  response=$(curl -s --max-time 60 \
-    -H "x-goog-api-key: $api_key" \
-    -H "Content-Type: application/json" \
-    -d "$request_body" \
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent")
-
-  # Extract base64 image data from response
-  local image_data
-  image_data=$(echo "$response" | jq -r '.candidates[0].content.parts[] | select(.inlineData) | .inlineData.data // empty' 2>/dev/null | head -1)
-
-  if [ -z "$image_data" ]; then
-    echo "[gazette] Gemini image generation failed for turn $target_turn" >&2
-    echo "$response" | jq -r '.error.message // empty' >&2 2>/dev/null
-    return 1
-  fi
-
-  # Save image to persistent storage and symlink to webroot
-  local filename="gazette-${target_turn}.png"
-  echo "$image_data" | base64 -d > "$SAVE_DIR/$filename"
-  ln -sf "$SAVE_DIR/$filename" "$WEBROOT/$filename"
-  echo "[gazette] Saved illustration: $filename" >&2
-  echo "$filename"
+  _gemini_generate_one "$prompt" "gazette-${target_turn}.png"
 }
 
 # ---------------------------------------------------------------------------
@@ -654,8 +906,26 @@ process_turn() {
   recent_headlines=$(echo "$GAZETTE_JSON" | jq --argjson t "$target_turn" \
     '[.[] | select(.turn < $t) | {turn: .turn, year_display: .year_display, headline: .headline}] | sort_by(-.turn) | .[:5]')
 
-  # Inject recent headlines into context
-  context=$(echo "$context" | jq --argjson rh "$recent_headlines" '. + {recent_headlines: $rh}')
+  # Pull every crossword word (from any past edition) so the AI never
+  # repeats — crosswords get stale fast when the same answers come up
+  # turn after turn. We collect uniquely from the v2 schema's
+  # pages[].sections[].entries[].word path AND the legacy v1 path where
+  # crosswords were inlined as section bodies.
+  local recent_crossword_words
+  recent_crossword_words=$(echo "$GAZETTE_JSON" | jq --argjson t "$target_turn" '
+    [
+      .[] | select(.turn < $t) |
+      (.pages // []) | .[] | (.sections // []) | .[] |
+      select(.kind == "puzzle" and .type == "crossword") |
+      (.entries // []) | .[] | .word
+    ] | map(ascii_upcase) | unique | sort
+  ')
+
+  # Inject into context
+  context=$(echo "$context" | jq \
+    --argjson rh "$recent_headlines" \
+    --argjson rcw "$recent_crossword_words" \
+    '. + {recent_headlines: $rh, recent_crossword_words: $rcw}')
 
   local entry="" attempt=1 max_attempts=3
   while [ "$attempt" -le "$max_attempts" ]; do
@@ -686,39 +956,54 @@ process_turn() {
   local year_display
   year_display=$(echo "$context" | jq -r '.year_display')
 
-  # Generate front-page illustration
-  local illustration=""
-  local headline fp_content ill_artist ill_desc
-  headline=$(echo "$entry" | jq -r '.headline')
-  fp_content=$(echo "$entry" | jq -r '.sections.front_page.content // .sections.front_page // ""')
-  ill_credit=$(echo "$entry" | jq -r '.illustration_caption.credit // ""')
-  ill_desc=$(echo "$entry" | jq -r '.illustration_caption.description // ""')
-  local _ill
-  _ill=$(plog_begin gazette "generate_illustration ${target_turn}")
-  illustration=$(generate_illustration "$headline" "$year" "$target_turn" "$fp_content" "$ill_credit" "$ill_desc") || true
-  plog_end gazette "generate_illustration ${target_turn} (out=${illustration:-none})" "$_ill"
+  # Determine schema. v2 → multi-image driver; v1 fallback → single
+  # illustration via the legacy helper.
+  local schema_version
+  schema_version=$(echo "$entry" | jq -r '.schema_version // 1')
+
+  if [ "$schema_version" = "2" ]; then
+    local _ig
+    _ig=$(plog_begin gazette "generate_images_for_entry ${target_turn} (v2)")
+    entry=$(generate_images_for_entry "$entry" "$target_turn" "$year")
+    plog_end gazette "generate_images_for_entry ${target_turn}" "$_ig"
+  else
+    local illustration=""
+    local headline fp_content ill_credit ill_desc
+    headline=$(echo "$entry" | jq -r '.headline')
+    fp_content=$(echo "$entry" | jq -r '.sections.front_page.content // .sections.front_page // ""')
+    ill_credit=$(echo "$entry" | jq -r '.illustration_caption.credit // ""')
+    ill_desc=$(echo "$entry" | jq -r '.illustration_caption.description // ""')
+    local _ill
+    _ill=$(plog_begin gazette "generate_illustration ${target_turn}")
+    illustration=$(generate_illustration "$headline" "$year" "$target_turn" "$fp_content" "$ill_credit" "$ill_desc") || true
+    plog_end gazette "generate_illustration ${target_turn} (out=${illustration:-none})" "$_ill"
+    # Stash the filename onto the entry so the v1 jq merge below can pick it up.
+    entry=$(echo "$entry" | jq --arg img "$illustration" '. + {_v1_illustration: $img}')
+  fi
 
   # Remove existing entry for this turn if rebuilding
   GAZETTE_JSON=$(echo "$GAZETTE_JSON" | jq --argjson t "$target_turn" '[.[] | select(.turn != $t)]')
 
-  # Add new entry (write entry to temp file to avoid ARG_MAX)
+  # Merge entry into gazette.json. v2 carries `pages`, `images`, etc;
+  # v1 carries `sections`, `opinion`, `letters`, `ads`, `corrections`,
+  # `illustration*`. The jq below preserves whichever set the AI returned.
   local _tmpentry=$(mktemp)
   echo "$entry" > "$_tmpentry"
   GAZETTE_JSON=$(echo "$GAZETTE_JSON" | jq --argjson t "$target_turn" --argjson y "$year" \
-    --arg yd "$year_display" --slurpfile entry "$_tmpentry" --arg img "$illustration" \
-    '$entry[0] as $entry | . + [{
-      turn: $t,
-      year: $y,
-      year_display: $yd,
-      headline: $entry.headline,
-      sections: $entry.sections,
-      opinion: $entry.opinion,
-      letters: $entry.letters,
-      ads: ($entry.ads // []),
-      corrections: ($entry.corrections // null),
-      illustration: (if $img != "" then $img else null end),
-      illustration_caption: ($entry.illustration_caption // null)
-    }] | sort_by(.turn)')
+    --arg yd "$year_display" --slurpfile entry "$_tmpentry" \
+    '$entry[0] as $entry |
+     # Common envelope fields the renderer relies on for masthead + sort.
+     ($entry + {turn: $t, year: $y, year_display: $yd}) as $with_meta |
+     # v1: stash the legacy illustration filename + caption alongside.
+     (if ($entry.schema_version // 1) == 2 then
+        $with_meta
+      else
+        $with_meta + {
+          illustration: (if ($entry._v1_illustration // "") != "" then $entry._v1_illustration else null end),
+          illustration_caption: ($entry.illustration_caption // null)
+        } | del(._v1_illustration)
+      end) as $final |
+     . + [$final] | sort_by(.turn)')
   rm -f "$_tmpentry"
 
   # Save after each entry

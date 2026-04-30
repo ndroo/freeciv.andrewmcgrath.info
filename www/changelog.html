@@ -65,6 +65,20 @@
 
   <div class="entry">
     <div class="entry-date">April 30, 2026</div>
+    <div class="entry-title">Civ Chronicle v2: Multi-Page Broadsheet</div>
+    <ul>
+      <li><span class="tag tag-new">New</span> <strong>Multi-page newspaper layout</strong> — the gazette renders as a broadsheet with a lead story, columns, opinion pieces, breaking news, sports, classifieds, corrections, and more. Sections flow into each other in a magazine-style two-column layout instead of one long article.</li>
+      <li><span class="tag tag-new">New</span> <strong>Per-region World Weather + Hazard Watch</strong> — every edition now has a weather almanac with cartoon emoji icons and a per-nation forecast grounded in each capital's actual map terrain (Forest, Plains, Hills, etc.). A Hazard Watch ledger tracks war smoke, alliance strain, siege fatigue, and other game-driven omens with severity badges (LOW / MODERATE / WATCH / SEVERE).</li>
+      <li><span class="tag tag-new">New</span> <strong>Real crossword puzzle</strong> — the AI provides 8–12 era-appropriate words and clues; a JS solver lays them out into a real intersecting grid. Each clue has a "reveal" button (1 reveal per hour, enforced via local storage). Clues reference real game state and won't repeat words across editions.</li>
+      <li><span class="tag tag-new">New</span> <strong>AI-generated illustrations per article</strong> — up to 6 freshly-painted, era-appropriate images per edition (Egyptian frescoes in the Bronze Age, illuminated manuscripts in the Medieval, lithographs in the 19th century, etc.) at 16:9 wide aspect.</li>
+      <li><span class="tag tag-new">New</span> <strong>Editor mailbox + classifieds + letters to the editor</strong> — players can write to the editor directly; their messages may appear (paraphrased or quoted) in future editions. Every issue includes 6 era-appropriate classifieds, a letters column, and an in-character corrections &amp; retractions block.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Streaming AI generation</strong> — chronicle generation now streams response tokens live to the terminal instead of going dark for 2-3 minutes. Failed calls dump full response bodies for diagnostics.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Email preview now handles v2 schema</strong> — turn-change emails were previously empty for v2 editions because the script only knew the v1 shape. Now correctly extracts the lead story + image and renders an email-friendly teaser block with the headline, byline, and a "Read the full issue →" link.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">April 30, 2026</div>
     <div class="entry-title">Status &amp; Dashboard Builders Rewritten in Python</div>
     <ul>
       <li><span class="tag tag-fix">Fix</span> <strong>No more 30-minute lock-stalls on turn change</strong> — the bash <code>build_diplomacy</code> and <code>build_attendance</code> functions iterated all save files and forked <code>jq</code> per relationship per turn, which on a 53-turn game took 30+ minutes and held the status-json lockfile the whole time. Cron runs every 5 min, so when the rebuild stalled, every subsequent run hit "Another instance is running, skipping" and <code>status.json</code> went stale for hours. The countdown timer would lock to 0:00 and the page reported a save_mtime from many hours back. Diplomacy and attendance rebuilds now happen in a python module (<code>python/lib/</code>) and finish in ~1.2s on the same input — a ~1500x speedup.</li>

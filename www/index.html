@@ -7,6 +7,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="/vendor/page-flip.browser.js"></script>
+  <link rel="stylesheet" href="/css/gazette.css">
   <style>
     :root {
       --bg: #0a0d14; --surface: #111621; --surface-2: #171d2b; --surface-3: #1e2538;
@@ -46,7 +48,13 @@
     .cd-unit { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:12px 16px; min-width:72px; text-align:center; }
     .cd-unit .val { font-size:32px; font-weight:800; color:var(--text-bright); font-variant-numeric:tabular-nums; line-height:1; }
     .cd-unit .lbl { font-size:9px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-dim); margin-top:4px; }
-    section { padding:40px 0; } section + section { border-top:1px solid var(--border); }
+    /* Top-level page sections only — exclude gazette internals
+     * (.gz-section). Without the :not() guard, the gazette's grid
+     * sections inherit a border-top that lands on whichever section
+     * happens to come next in DOM order, which doesn't match the
+     * visual column order under grid-auto-flow:dense. */
+    section:not(.gz-section) { padding:40px 0; }
+    section:not(.gz-section) + section:not(.gz-section) { border-top:1px solid var(--border); }
     .section-head { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
     .section-head h2 { font-size:14px; font-weight:700; color:var(--text-bright); text-transform:uppercase; letter-spacing:1.5px; white-space:nowrap; }
     .section-head .line { flex:1; height:1px; background:var(--border); }
@@ -115,64 +123,7 @@
     .hl-nav button:hover { border-color:var(--text-dim); color:var(--text-bright); }
     .hl-nav button:disabled { opacity:0.3; cursor:default; }
     .hl-nav button:disabled:hover { border-color:var(--border); color:var(--text); }
-    .gazette { background:#f5f0e6; border:none; border-radius:0; padding:0; color:#1a1a1a; font-family:'Georgia','Times New Roman',serif; }
-    .gazette-masthead { text-align:center; padding:24px 32px 16px; border-bottom:4px double #1a1a1a; }
-    .gazette-masthead-name { font-size:42px; font-weight:900; color:#1a1a1a; letter-spacing:2px; font-family:'Georgia',serif; line-height:1; }
-    .gazette-masthead-sub { font-size:11px; color:#666; text-transform:uppercase; letter-spacing:4px; margin-top:6px; }
-    .gazette-masthead-rule { border:none; border-top:1px solid #1a1a1a; margin:12px 0 0; }
-    .gazette-masthead-meta { display:flex; justify-content:space-between; font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; padding:6px 0; border-bottom:1px solid #ccc; }
-    .gazette-headline { font-size:26px; font-weight:900; color:#1a1a1a; line-height:1.2; margin:0; letter-spacing:-0.5px; font-family:'Georgia',serif; text-align:center; padding:20px 32px 6px; }
-    .gazette-headline-byline { font-size:11px; color:#666; text-align:center; font-style:italic; padding:0 32px 14px; border-bottom:1px solid #ccc; margin-bottom:0; }
-    .gazette-front { display:grid; grid-template-columns:1fr 280px; gap:0; border-bottom:1px solid #ccc; }
-    .gazette-front-text { padding:16px 20px; border-right:1px solid #ccc; }
-    .gazette-front-aside { padding:16px 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-    .gazette-front-aside img { width:100%; border:1px solid #999; }
-    .gazette-img-caption { font-size:9px; color:#666; text-align:center; line-height:1.4; margin-top:6px; border-top:1px solid #ccc; padding-top:5px; }
-    .gazette-img-desc { font-style:italic; }
-    .gazette-img-credit { display:block; margin-top:3px; font-style:normal; font-weight:600; color:#888; }
-    @media(max-width:700px) { .gazette-front { grid-template-columns:1fr; } .gazette-front-text { border-right:none; border-bottom:1px solid #ccc; } }
-    .gazette-cols { display:grid; grid-template-columns:1fr 1fr; gap:0; padding:0; }
-    .gazette-col { padding:14px 20px; border-right:1px solid #ccc; }
-    .gazette-col:last-child { border-right:none; }
-    .gazette-col-title { font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#1a1a1a; border-bottom:2px solid #1a1a1a; padding-bottom:4px; margin-bottom:4px; }
-    .gazette-col-byline { font-size:10px; color:#888; font-style:italic; margin-bottom:8px; }
-    .gazette-body p { margin-bottom:8px; font-size:12.5px; line-height:1.6; color:#2a2a2a; text-align:justify; }
-    .gazette-body p:last-child { margin-bottom:0; }
-    .gazette-body strong { color:#1a1a1a; }
-    .gazette-body em { font-style:italic; }
-    .gazette-opinion { padding:16px 20px; border-top:2px solid #1a1a1a; background:#ede8d8; }
-    .gazette-opinion-label { font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#1a1a1a; border-bottom:1px solid #1a1a1a; padding-bottom:4px; margin-bottom:10px; }
-    .gazette-opinion-col-title { font-size:16px; font-weight:800; color:#1a1a1a; line-height:1.3; margin-bottom:2px; font-family:'Georgia',serif; }
-    .gazette-opinion-author { font-size:12px; font-weight:700; color:#1a1a1a; }
-    .gazette-opinion-title-line { font-size:10px; color:#888; font-style:italic; margin-bottom:10px; }
-    .gazette-letters { padding:16px 20px; border-top:1px solid #ccc; }
-    .gazette-letters-title { font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#1a1a1a; border-bottom:1px solid #1a1a1a; padding-bottom:4px; margin-bottom:12px; }
-    .gazette-letter { margin-bottom:12px; }
-    .gazette-letter p { font-size:12px; line-height:1.6; color:#2a2a2a; margin:0; font-style:italic; }
-    .gazette-letter-author { font-size:10px; color:#666; font-weight:600; margin-top:2px; text-align:right; }
-    .gazette-standings { padding:16px 20px; border-top:2px solid #1a1a1a; }
-    .gazette-standings-title { font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#1a1a1a; border-bottom:1px solid #1a1a1a; padding-bottom:4px; margin-bottom:10px; }
-    .gazette-standings table { width:100%; border-collapse:collapse; font-size:11px; }
-    .gazette-standings th { text-align:left; font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#888; padding:4px 6px; border-bottom:1px solid #ccc; }
-    .gazette-standings td { padding:3px 6px; color:#2a2a2a; border-bottom:1px solid #e5e0d5; }
-    .gazette-standings tr:last-child td { border-bottom:none; }
-    .gazette-standings .rank { font-weight:700; color:#1a1a1a; }
-    .gazette-corrections { padding:12px 20px; border-top:1px solid #ccc; background:#f0ebe0; }
-    .gazette-corrections-title { font-size:10px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#8b0000; margin-bottom:6px; }
-    .gazette-corrections p { font-size:12px; line-height:1.6; color:#2a2a2a; margin:0; font-style:italic; }
-    .gazette-ads { padding:14px 20px; border-top:1px solid #ccc; }
-    .gazette-ads-title { font-size:9px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#888; margin-bottom:10px; text-align:center; border-bottom:1px solid #ccc; padding-bottom:6px; }
-    .gazette-ads-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
-    @media(max-width:700px) { .gazette-ads-grid { grid-template-columns:1fr 1fr; } }
-    @media(max-width:450px) { .gazette-ads-grid { grid-template-columns:1fr; } }
-    .gazette-ad { font-size:9.5px; line-height:1.4; color:#333; text-align:left; padding:6px 8px; border-bottom:1px solid #d5d0c5; }
-    .gazette-footer { text-align:center; padding:10px; border-top:4px double #1a1a1a; font-size:9px; color:#888; text-transform:uppercase; letter-spacing:2px; }
-    .gazette-inprint { padding:60px 32px; text-align:center; background:#f5f0e6; }
-    .gazette-inprint-label { font-size:10px; text-transform:uppercase; letter-spacing:4px; color:#8b0000; margin-bottom:14px; font-weight:700; }
-    .gazette-inprint-headline { font-size:28px; font-weight:900; color:#1a1a1a; line-height:1.3; font-family:'Georgia',serif; margin-bottom:12px; }
-    .gazette-inprint-sub { font-size:13px; color:#666; font-style:italic; max-width:440px; margin:0 auto; line-height:1.6; }
-    .gazette-inprint-spinner { display:inline-block; width:10px; height:10px; background:#8b0000; border-radius:50%; margin:18px 0 0; animation:pulse 1.4s infinite; }
-    @media(max-width:600px) { .gazette-cols { grid-template-columns:1fr; } .gazette-col { border-right:none; border-bottom:1px solid #ccc; } .gazette-masthead-name { font-size:28px; } .gazette-headline { font-size:20px; padding:16px 16px 6px; } .gazette-headline-byline { padding:0 16px 12px; } .gazette-col { padding:12px 16px; } .gazette-opinion { padding:12px 16px; } .gazette-letters { padding:12px 16px; } .gazette-standings { padding:12px 16px; } .gazette { padding:0; } }
+    /* Gazette CSS lives in /css/gazette.css (linked above). */
     .hl-nav .hl-label { color:var(--text-dim); font-size:13px; flex:1; text-align:center; }
     .hl-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; font-size:13px; line-height:1.5; }
     .hl-item + .hl-item { border-top:1px solid rgba(37,45,66,0.3); }
@@ -240,7 +191,12 @@
 <div class="hero"><div class="wrap" id="hero-content"><div class="kicker">Loading...</div></div></div>
 
 <div class="wrap">
-  <div id="gazette-section"></div>
+  <!-- Reserve roughly the height of a typical gazette so the rest of the
+       page (Rankings, History) doesn't have to leap downward when the
+       gazette finishes loading. Real SSR would be cleaner; this placeholder
+       is the band-aid until then. The min-height is overridden once the
+       gazette renders. -->
+  <div id="gazette-section" style="min-height:1800px;"></div>
   <div id="headlines-section"></div>
   <div id="rankings-section"><section><div class="section-head"><h2>Rankings</h2><div class="line"></div></div><div class="skel-head" style="width:200px;"></div><div id="skel-rankings"></div></section></div>
   <div id="history-section"><section><div class="section-head"><h2>History</h2><div class="line"></div></div><div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;height:320px;display:flex;align-items:center;justify-content:center;"><div class="skel-bar" style="width:60%;height:200px;border-radius:8px;"></div></div></section></div>
@@ -686,8 +642,480 @@
 
   var gazetteTurn = -1;
 
+  // ---------------------------------------------------------------------
+  // Gazette body builders. Each returns a single HTML string that gets
+  // injected inside the masthead/nav wrapper built by renderGazette().
+  //
+  //   v0 — turns  2-10 — bare prose: { headline, article }
+  //   v1 — turns 11-52 — single-page structured: { sections, opinion, ... }
+  //   v2 — turns 53+   — multi-page broadsheet: { pages: [...], images: [...] }
+  //
+  // Renderer dispatches by feature detection on the entry shape so the
+  // 50+ historical editions stay viewable alongside any new format.
+  // ---------------------------------------------------------------------
+
+  function renderGazetteV0(g, esc) {
+    return '<div class="gazette-headline" style="text-align:left;padding:18px 32px 6px;">' + esc(g.headline) + '</div>' +
+      '<div style="font-size:11px;color:#888;font-style:italic;padding:0 32px 14px;">The Civ Chronicle &middot; Turn ' + g.turn + ' &middot; ' + esc(g.year_display) + '</div>' +
+      '<div class="gazette-v0-article gazette-body">' + g.article + '</div>';
+  }
+
+  function renderGazetteV1(g, d, esc) {
+    var html = '';
+    var fp = g.sections.front_page || {};
+    var fpContent = typeof fp === 'string' ? fp : fp.content || '';
+    var fpByline = fp.byline || '';
+
+    html += '<div class="gazette-headline">' + esc(g.headline) + '</div>' +
+      '<div class="gazette-headline-byline">' + esc(fpByline) + '</div>' +
+      '<div class="gazette-front">' +
+        '<div class="gazette-front-text"><div class="gazette-body">' + fpContent + '</div></div>' +
+        (g.illustration ? '<div class="gazette-front-aside"><img src="/' + esc(g.illustration) + '" alt="' + esc(g.headline) + '">' +
+          (g.illustration_caption ? '<div class="gazette-img-caption"><span class="gazette-img-desc">' + (g.illustration_caption.description || '').replace(/<[^>]*>/g,'') + '</span><span class="gazette-img-credit">' + esc(g.illustration_caption.credit || g.illustration_caption.artist || '') + '</span></div>' : '') +
+        '</div>' : '') +
+      '</div>';
+
+    var econ = g.sections.economy || {};
+    var mil = g.sections.military || {};
+    html += '<div class="gazette-cols">' +
+      '<div class="gazette-col">' +
+        '<div class="gazette-col-title">Economy</div>' +
+        '<div class="gazette-col-byline">' + esc(typeof econ === 'string' ? '' : econ.byline || '') + '</div>' +
+        '<div class="gazette-body">' + (typeof econ === 'string' ? econ : econ.content || '') + '</div>' +
+      '</div>' +
+      '<div class="gazette-col">' +
+        '<div class="gazette-col-title">Military</div>' +
+        '<div class="gazette-col-byline">' + esc(typeof mil === 'string' ? '' : mil.byline || '') + '</div>' +
+        '<div class="gazette-body">' + (typeof mil === 'string' ? mil : mil.content || '') + '</div>' +
+      '</div>' +
+    '</div>';
+
+    var soc = g.sections.society || {};
+    var rankingsHtml = '';
+    if (d.players && d.players.length) {
+      var sortedPlayers = d.players.slice().sort(function(a,b) { return (b.score||0) - (a.score||0); });
+      rankingsHtml = '<table>';
+      rankingsHtml += '<tr><th>#</th><th>Nation</th><th>Score</th><th>Cities</th><th>Units</th></tr>';
+      sortedPlayers.forEach(function(p, i) {
+        rankingsHtml += '<tr><td class="rank">' + (i+1) + '</td><td>' + esc(p.name) + '</td><td>' + (p.score||0) + '</td><td>' + (p.cities||0) + '</td><td>' + (p.units||0) + '</td></tr>';
+      });
+      rankingsHtml += '</table>';
+    }
+    html += '<div class="gazette-cols">' +
+      '<div class="gazette-col">' +
+        '<div class="gazette-col-title">Society</div>' +
+        '<div class="gazette-col-byline">' + esc(typeof soc === 'string' ? '' : soc.byline || '') + '</div>' +
+        '<div class="gazette-body">' + (typeof soc === 'string' ? soc : soc.content || '') + '</div>' +
+      '</div>' +
+      '<div class="gazette-col">' +
+        '<div class="gazette-standings">' +
+          '<div class="gazette-standings-title">Standings</div>' +
+          rankingsHtml +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    if (g.opinion) {
+      html += '<div class="gazette-opinion">' +
+        '<div class="gazette-opinion-label">Opinion</div>' +
+        '<div class="gazette-opinion-col-title">' + esc(g.opinion.title) + '</div>' +
+        '<div class="gazette-opinion-title-line">' +
+          '<span class="gazette-opinion-author">' + esc(g.opinion.author) + '</span>' +
+          (g.opinion.author_title ? ' &mdash; ' + esc(g.opinion.author_title) : '') +
+        '</div>' +
+        '<div class="gazette-body">' + g.opinion.content + '</div>' +
+      '</div>';
+    }
+
+    if (g.letters && g.letters.length) {
+      html += '<div class="gazette-letters">' +
+        '<div class="gazette-letters-title">Letters to the Editor</div>';
+      g.letters.forEach(function(letter) {
+        html += '<div class="gazette-letter">' +
+          '<p>' + letter.content + '</p>' +
+          '<div class="gazette-letter-author">&mdash; ' + esc(letter.author) + '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (g.corrections && g.corrections !== 'null') {
+      html += '<div class="gazette-corrections">' +
+        '<div class="gazette-corrections-title">Corrections &amp; Retractions</div>' +
+        '<p>' + g.corrections + '</p>' +
+      '</div>';
+    }
+
+    if (g.ads && g.ads.length) {
+      html += '<div class="gazette-ads">' +
+        '<div class="gazette-ads-title">Classifieds</div>' +
+        '<div class="gazette-ads-grid">';
+      g.ads.forEach(function(ad) {
+        var clean = ad.replace(/<[^>]*>/g,'');
+        clean = clean.replace(/^([A-Z][A-Z\s&\/\-]+[:—])/, '<strong>$1</strong>');
+        html += '<div class="gazette-ad">' + clean + '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    html += '<div style="text-align:center;padding:14px 20px;border-top:1px solid #ccc;"><a href="/editor.html" style="font-family:Georgia,serif;font-size:13px;color:#1a1a1a;text-decoration:none;font-style:italic;">Have a tip? A proclamation? A complaint? <strong style="text-decoration:underline;">Write to the Editor</strong> &rarr;</a></div>';
+    html += '<div class="gazette-footer">The Civ Chronicle &mdash; All the civilization that\'s fit to print</div>';
+    return html;
+  }
+
+  // -------------------------------------------------------------------
+  // v2 multi-page renderer.
+  //
+  // The AI is the editor — it picks page count, section kinds, and
+  // image placement. The renderer just maps section.kind to a small HTML
+  // template (defined in TEMPLATES below). Unknown kinds fall back to a
+  // generic prose block so the AI can experiment with new section names
+  // without breaking the page.
+  //
+  // Image placement modes:
+  //   - section.lead_image_id  → hero image at top of that section
+  //   - {{img:id}} in content  → inline figure at that position
+  //   - section.kind === 'image' → standalone visual block
+  //
+  // Output is wrapped in a <div class="gazette-book">; if there are 2+
+  // pages, page-flip is initialised against it after DOM injection (see
+  // initGazetteFlipbook).
+  // -------------------------------------------------------------------
+
+  function renderGazetteV2(g, d, esc) {
+    var images = g.images || [];
+    var imgById = {};
+    images.forEach(function(im) { if (im && im.id) imgById[im.id] = im; });
+
+    function leadImageHtml(id) {
+      var im = imgById[id];
+      if (!im || !im.file) return '';
+      return '<figure class="gz-lead-img">' +
+        '<img src="/' + esc(im.file) + '" alt="' + esc(im.caption || '') + '">' +
+        '<figcaption class="gazette-img-caption">' +
+          '<span class="gazette-img-desc">' + esc(im.caption || '') + '</span>' +
+          (im.credit ? '<span class="gazette-img-credit">' + esc(im.credit) + '</span>' : '') +
+        '</figcaption>' +
+      '</figure>';
+    }
+    function inlineImageHtml(id) {
+      var im = imgById[id];
+      if (!im || !im.file) return '';
+      return '<figure class="gz-inline-img">' +
+        '<img src="/' + esc(im.file) + '" alt="' + esc(im.caption || '') + '">' +
+        '<figcaption class="gazette-img-caption">' +
+          '<span class="gazette-img-desc">' + esc(im.caption || '') + '</span>' +
+          (im.credit ? '<span class="gazette-img-credit">' + esc(im.credit) + '</span>' : '') +
+        '</figcaption>' +
+      '</figure>';
+    }
+    function expandInlineTokens(content) {
+      return (content || '').replace(/\{\{img:([a-z0-9_-]+)\}\}/gi, function(_, id) {
+        return inlineImageHtml(id);
+      });
+    }
+
+    function tplLead(s) {
+      // Headline first (newspaper convention), then byline, then image
+      // (constrained width so it doesn't dominate the page), then body.
+      return '<section class="gz-section gz-kind-lead">' +
+        (s.title ? '<h2 class="gz-section-title">' + esc(s.title) + '</h2>' : '') +
+        (s.byline ? '<div class="gz-section-byline">' + esc(s.byline) + '</div>' : '') +
+        (s.lead_image_id ? leadImageHtml(s.lead_image_id) : '') +
+        '<div class="gz-body">' + expandInlineTokens(s.content) + '</div>' +
+      '</section>';
+    }
+    function tplProse(s, kindClass) {
+      return '<section class="gz-section ' + kindClass + '">' +
+        (s.lead_image_id ? leadImageHtml(s.lead_image_id) : '') +
+        (s.title ? '<h3 class="gz-section-title">' + esc(s.title) + '</h3>' : '') +
+        (s.byline ? '<div class="gz-section-byline">' + esc(s.byline) + '</div>' : '') +
+        '<div class="gz-body">' + expandInlineTokens(s.content) + '</div>' +
+      '</section>';
+    }
+    function tplOpinion(s) {
+      return '<section class="gz-section gz-kind-opinion">' +
+        '<h3 class="gz-section-title">Opinion</h3>' +
+        (s.lead_image_id ? leadImageHtml(s.lead_image_id) : '') +
+        (s.title ? '<div class="gazette-opinion-col-title">' + esc(s.title) + '</div>' : '') +
+        '<div class="gz-opinion-author">' + esc(s.author || '') + '</div>' +
+        (s.author_title ? '<div class="gz-opinion-author-title">' + esc(s.author_title) + '</div>' : '') +
+        '<div class="gz-body">' + expandInlineTokens(s.content) + '</div>' +
+      '</section>';
+    }
+    function tplInterview(s) {
+      return '<section class="gz-section gz-kind-interview">' +
+        '<h3 class="gz-section-title">' + esc(s.title || 'An Interview') + '</h3>' +
+        (s.subject ? '<div class="gz-interview-subject">With ' + esc(s.subject) + '</div>' : '') +
+        (s.byline ? '<div class="gz-section-byline">' + esc(s.byline) + '</div>' : '') +
+        (s.lead_image_id ? leadImageHtml(s.lead_image_id) : '') +
+        '<div class="gz-body">' + expandInlineTokens(s.content) + '</div>' +
+      '</section>';
+    }
+    function tplLetters(s) {
+      var inner = (s.items || []).map(function(L) {
+        return '<div class="gz-letter">' +
+          (L.title ? '<div class="gz-letter-title">' + esc(L.title) + '</div>' : '') +
+          '<p>' + (L.body || L.content || '') + '</p>' +
+          '<div class="gz-letter-author">&mdash; ' + esc(L.from || L.author || '') + '</div>' +
+        '</div>';
+      }).join('');
+      return '<section class="gz-section gz-kind-letters">' +
+        '<h3 class="gz-section-title">Letters to the Editor</h3>' + inner +
+      '</section>';
+    }
+    function tplSports(s) {
+      var rows = (s.results || []).map(function(r) {
+        return '<div class="gz-result-row"><span>' + esc(r.match || r.event || '') + '</span><span>' + esc(r.outcome || r.score || '') + '</span></div>';
+      }).join('');
+      return '<section class="gz-section gz-kind-sports">' +
+        '<h3 class="gz-section-title">' + esc(s.title || 'Sports') + '</h3>' +
+        (s.byline ? '<div class="gz-section-byline">' + esc(s.byline) + '</div>' : '') +
+        (s.report ? '<div class="gz-body"><p>' + s.report + '</p></div>' : '') +
+        (rows ? '<div class="gz-results">' + rows + '</div>' : '') +
+      '</section>';
+    }
+    function tplWeather(s) {
+      // Weather/augury is always full-width (CSS rule on .gz-kind-weather
+      // promotes it). The seven-day outlook (days[]) was retired — it
+      // was generic poetic prose with no clear "for whom" anchor, which
+      // read as filler. Per-region weather + hazard watch are the only
+      // two blocks now, both grounded in real game state.
+      var html = '<section class="gz-section gz-kind-weather">' +
+        '<h3 class="gz-section-title">' + esc(s.label || s.title || 'Forecast') + '</h3>';
+      // Headline forecast — the poetic one-liner
+      var forecast = s.forecast || s.report || '';
+      if (forecast) {
+        html += '<div class="gz-weather-forecast">' + esc(forecast) + '</div>';
+      }
+      // World weather grid — per-nation forecasts with cartoon icons.
+      // Schema: regions: [{nation, capital, terrain, icon, forecast, omen?}]
+      // Renders as a 3-col grid: with 3 entries, one row fills perfectly;
+      // with 6, two rows fill perfectly. Any other count leaves empty
+      // cells so we trim to whichever target is closest from below
+      // (5 → 3, 7 → 6, etc.) for a clean grid.
+      if (s.regions && s.regions.length) {
+        var regions = s.regions.slice();
+        if (regions.length >= 6) regions = regions.slice(0, 6);
+        else if (regions.length >= 3) regions = regions.slice(0, 3);
+        // (if fewer than 3, render as-is — better than dropping all)
+        html += '<div class="gz-weather-regions"><div class="gz-weather-regions-title">World Weather</div>' +
+          '<div class="gz-weather-region-grid">';
+        regions.forEach(function(r) {
+          html += '<div class="gz-weather-region">' +
+            '<div class="gz-weather-region-icon">' + esc(r.icon || '☁️') + '</div>' +
+            '<div class="gz-weather-region-body">' +
+              '<div class="gz-weather-region-place">' +
+                '<span class="gz-weather-region-nation">' + esc(r.nation || '?') + '</span>' +
+                (r.capital ? ' <span class="gz-weather-region-capital">· ' + esc(r.capital) + '</span>' : '') +
+                (r.terrain ? ' <span class="gz-weather-region-terrain">(' + esc(r.terrain) + ')</span>' : '') +
+              '</div>' +
+              '<div class="gz-weather-region-forecast">' + esc(r.forecast || '') + '</div>' +
+              (r.omen ? '<div class="gz-weather-region-omen">' + esc(r.omen) + '</div>' : '') +
+            '</div>' +
+          '</div>';
+        });
+        html += '</div></div>';
+      }
+      // (Seven-day outlook retired — see comment at top of tplWeather.)
+      // Hazard outlooks — flood, fire, locusts, plague, etc. Schema:
+      //   outlooks: [ { kind: "flood", level: "low|moderate|severe|watch", note: "..." }, ... ]
+      if (s.outlooks && s.outlooks.length) {
+        html += '<div class="gz-weather-outlooks"><div class="gz-weather-outlooks-title">Hazard Watch</div>';
+        s.outlooks.forEach(function(o) {
+          var level = (o.level || 'unknown').toLowerCase();
+          html += '<div class="gz-weather-outlook gz-weather-level-' + esc(level) + '">' +
+            '<span class="gz-weather-outlook-level">' + esc(o.level || '') + '</span>' +
+            '<span class="gz-weather-outlook-kind">' + esc((o.kind || '').toUpperCase()) + '</span>' +
+            '<span class="gz-weather-outlook-note">' + esc(o.note || '') + '</span>' +
+          '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</section>';
+      return html;
+    }
+    function tplLottery(s) {
+      var nums = (s.numbers || []).map(function(n) {
+        return '<span class="gz-lottery-number">' + esc(String(n)) + '</span>';
+      }).join('');
+      return '<section class="gz-section gz-kind-lottery">' +
+        '<h3 class="gz-section-title">' + esc(s.label || s.title || 'Auspicious Numbers') + '</h3>' +
+        '<div class="gz-lottery-numbers">' + nums + '</div>' +
+        (s.note ? '<div class="gz-lottery-label">' + esc(s.note) + '</div>' : '') +
+      '</section>';
+    }
+    function tplPuzzle(s) {
+      var title = s.title || (s.type ? s.type.charAt(0).toUpperCase() + s.type.slice(1) : 'Puzzle');
+      var body = '';
+      if (s.type === 'crossword' && s.entries && s.entries.length) {
+        // AI gives us {word, clue}; we build the grid here so words
+        // actually intersect. Skip any word that can't be placed.
+        // Pass the turn through so reveal-tracking can persist across
+        // page loads (key includes the turn).
+        body = renderCrossword(s.entries, esc, g.turn);
+      } else if (s.type === 'word_search' && s.grid) {
+        body = '<div class="gz-puzzle-grid">' + esc(s.grid) + '</div>';
+        if (s.words && s.words.length) {
+          body += '<div class="gz-wordsearch-list"><strong>Find:</strong> ' +
+            s.words.map(function(w) { return esc(w); }).join(' &middot; ') + '</div>';
+        }
+      } else if (s.type === 'cipher') {
+        body = (s.cipher_text ? '<div class="gz-puzzle-grid">' + esc(s.cipher_text) + '</div>' : '') +
+          (s.hint ? '<div class="gz-puzzle-clues"><em>Hint:</em> ' + esc(s.hint) + '</div>' : '');
+      } else if (s.clues && s.clues.length) {
+        // Legacy fallback
+        var clues = s.clues.map(function(c, i) {
+          var label = (c.label || (i + 1) + '.');
+          return '<div class="gz-puzzle-clue"><strong>' + esc(label) + '</strong> ' + esc(c.clue || c.text || '') + '</div>';
+        }).join('');
+        body = (s.grid ? '<div class="gz-puzzle-grid">' + esc(s.grid) + '</div>' : '') +
+          '<div class="gz-puzzle-clues">' + clues + '</div>';
+      }
+      return '<section class="gz-section gz-kind-puzzle">' +
+        '<h3 class="gz-section-title">' + esc(title) + '</h3>' +
+        body +
+      '</section>';
+    }
+    function tplMarketplace(s) {
+      var rows = (s.items || []).map(function(it) {
+        return '<div class="gz-market-row"><span>' + esc(it.commodity || it.name || '') + '</span><span>' + esc(it.price || '') + '</span></div>';
+      }).join('');
+      return '<section class="gz-section gz-kind-marketplace">' +
+        '<h3 class="gz-section-title">' + esc(s.title || 'Marketplace') + '</h3>' + rows +
+      '</section>';
+    }
+    function tplAds(s) {
+      // Always render exactly 6 ads. If the AI gave fewer, pad with
+      // placeholder slots so the grid is balanced; if more, trim.
+      var items = (s.items || []).slice(0, 6);
+      while (items.length < 6) {
+        items.push('NOTICE — This space available. Inquire at the Chronicle\'s editorial offices.');
+      }
+      var inner = items.map(function(ad) {
+        var clean = (typeof ad === 'string' ? ad : (ad.text || '')).replace(/<[^>]*>/g, '');
+        clean = clean.replace(/^([A-Z][A-Z\s&\/\-]+[:—])/, '<strong>$1</strong>');
+        return '<div class="gz-ad">' + clean + '</div>';
+      }).join('');
+      return '<section class="gz-section gz-kind-ads">' +
+        '<h3 class="gz-section-title">Classifieds</h3>' +
+        '<div class="gz-ads-grid">' + inner + '</div>' +
+      '</section>';
+    }
+    function tplCorrections(s) {
+      return '<section class="gz-section gz-kind-corrections">' +
+        '<h3 class="gz-section-title">Corrections &amp; Retractions</h3>' +
+        '<div class="gz-body">' + (s.content || '') + '</div>' +
+      '</section>';
+    }
+    function tplStandaloneImage(s) {
+      var im = imgById[s.image_id];
+      if (!im || !im.file) {
+        return '<section class="gz-section gz-img-missing"><em>(Photo unavailable)</em></section>';
+      }
+      var sizeClass = s.size ? ' gz-size-' + esc(s.size) : '';
+      return '<section class="gz-section gz-standalone-img' + sizeClass + '">' +
+        '<img src="/' + esc(im.file) + '" alt="' + esc(im.caption || '') + '">' +
+        (im.caption ? '<div class="gazette-img-caption"><span class="gazette-img-desc">' + esc(im.caption) + '</span>' +
+          (im.credit ? '<span class="gazette-img-credit">' + esc(im.credit) + '</span>' : '') +
+        '</div>' : '') +
+      '</section>';
+    }
+    function tplGeneric(s, kindClass) {
+      return '<section class="gz-section ' + kindClass + '">' +
+        (s.lead_image_id ? leadImageHtml(s.lead_image_id) : '') +
+        (s.title ? '<h3 class="gz-section-title">' + esc(s.title) + '</h3>' : '') +
+        (s.byline ? '<div class="gz-section-byline">' + esc(s.byline) + '</div>' : '') +
+        '<div class="gz-body">' + expandInlineTokens(s.content || '') + '</div>' +
+      '</section>';
+    }
+
+    var TEMPLATES = {
+      lead:           function(s) { return tplLead(s); },
+      column:         function(s) { return tplProse(s, 'gz-kind-column'); },
+      feature:        function(s) { return tplProse(s, 'gz-kind-feature'); },
+      society:        function(s) { return tplProse(s, 'gz-kind-society'); },
+      dispatch:       function(s) { return tplProse(s, 'gz-kind-dispatch'); },
+      breaking:       function(s) { return tplProse(s, 'gz-kind-breaking'); },
+      obituary:       function(s) { return tplProse(s, 'gz-kind-obituary'); },
+      looking_back:   function(s) { return tplProse(s, 'gz-kind-looking_back'); },
+      rumour_mill:    function(s) {
+        // AI often omits a title for the gossip column. Default it so
+        // the section reads like a newspaper page, not orphan text.
+        if (!s.title) s = Object.assign({}, s, { title: 'The Rumour Mill' });
+        return tplProse(s, 'gz-kind-rumour_mill');
+      },
+      etiquette:      function(s) { return tplProse(s, 'gz-kind-etiquette'); },
+      serial_fiction: function(s) { return tplProse(s, 'gz-kind-serial_fiction'); },
+      infographic:    function(s) { return s.image_id ? tplStandaloneImage(s) : tplProse(s, 'gz-kind-infographic'); },
+      opinion:     tplOpinion,
+      interview:   tplInterview,
+      letters:     tplLetters,
+      sports:      tplSports,
+      weather:     tplWeather,
+      augury:      tplWeather,
+      lottery:     tplLottery,
+      puzzle:      tplPuzzle,
+      marketplace: tplMarketplace,
+      ads:         tplAds,
+      corrections: tplCorrections,
+      image:       tplStandaloneImage
+    };
+
+    function renderSection(s) {
+      if (!s || typeof s !== 'object') return '';
+      var fn = TEMPLATES[s.kind];
+      if (fn) return fn(s);
+      return tplGeneric(s, 'gz-kind-unknown gz-kind-' + esc(s.kind || 'untyped'));
+    }
+
+    // Single masthead at the top. The page-flip mechanic was retired in
+    // favor of one long scrollable broadsheet — fewer moving parts, no
+    // height-locking layout shift, and the reader can ctrl-F.
+    var masthead =
+      '<div class="gazette-masthead">' +
+        '<div class="gazette-masthead-name">The Civ Chronicle</div>' +
+        '<div class="gazette-masthead-sub">All the civilization that\'s fit to print</div>' +
+        '<div class="gazette-masthead-meta">' +
+          '<span>Turn ' + g.turn + '</span>' +
+          '<span>' + esc(g.year_display) + '</span>' +
+          '<span>Vol. I, No. ' + g.turn + '</span>' +
+        '</div>' +
+      '</div>';
+
+    // Flatten every section across every page into one continuous list.
+    // The AI's `pages[]` structure is ignored at render time — the grid
+    // layout below packs single-col + span-all sections naturally.
+    var allSections = [];
+    (g.pages || []).forEach(function(page) {
+      (page.sections || []).forEach(function(s) { allSections.push(s); });
+    });
+    var sectionsHtml = allSections.map(renderSection).join('');
+
+    var label = g.edition_label
+      ? '<div class="gz-edition-label">' + esc(g.edition_label) + '</div>' : '';
+
+    // The "book" is now a single scrolling broadsheet — kept the
+    // .gazette-book + .gazette-page class names so all the section
+    // styling continues to work without churn.
+    var book = '<div class="gazette-book" id="gazette-book">' +
+      '<div class="gazette-page" data-page="1">' +
+        masthead +
+        sectionsHtml +
+      '</div>' +
+    '</div>';
+
+    var footer = '<div style="text-align:center;padding:14px 20px;border-top:1px solid #ccc;"><a href="/editor.html" style="font-family:Georgia,serif;font-size:13px;color:#1a1a1a;text-decoration:none;font-style:italic;">Have a tip? A proclamation? A complaint? <strong style="text-decoration:underline;">Write to the Editor</strong> &rarr;</a></div>' +
+      '<div class="gazette-footer">The Civ Chronicle &mdash; All the civilization that\'s fit to print</div>';
+
+    return label + book + footer;
+  }
+
   function renderGazette(d) {
     var sec = document.getElementById('gazette-section');
+    // Drop the layout-stabilising placeholder min-height now that real
+    // content is about to take its place (see HTML markup).
+    sec.style.minHeight = '';
     if (d.game.turn === 0) { sec.innerHTML = ''; return; }
 
     var entries = (d.gazette && d.gazette.length) ? d.gazette : [];
@@ -739,124 +1167,17 @@
       return html;
     }
 
+    // Dispatch by schema feature so v0/v1/v2 editions all render via
+    // their respective body builders (defined just above renderGazette).
     var bodyHtml = '';
-
-    // New format with sections
-    if (g.sections) {
-      var fp = g.sections.front_page || {};
-      var fpContent = typeof fp === 'string' ? fp : fp.content || '';
-      var fpByline = fp.byline || '';
-
-      // Front page as lead story with side illustration
-      bodyHtml += '<div class="gazette-headline">' + esc(g.headline) + '</div>' +
-        '<div class="gazette-headline-byline">' + esc(fpByline) + '</div>' +
-        '<div class="gazette-front">' +
-          '<div class="gazette-front-text"><div class="gazette-body">' + fpContent + '</div></div>' +
-          (g.illustration ? '<div class="gazette-front-aside"><img src="/' + esc(g.illustration) + '" alt="' + esc(g.headline) + '">' +
-            (g.illustration_caption ? '<div class="gazette-img-caption"><span class="gazette-img-desc">' + (g.illustration_caption.description || '').replace(/<[^>]*>/g,'') + '</span><span class="gazette-img-credit">' + esc(g.illustration_caption.credit || g.illustration_caption.artist || '') + '</span></div>' : '') +
-          '</div>' : '') +
-        '</div>';
-
-      // Two-column grid: Economy + Military
-      var econ = g.sections.economy || {};
-      var mil = g.sections.military || {};
-      bodyHtml += '<div class="gazette-cols">' +
-        '<div class="gazette-col">' +
-          '<div class="gazette-col-title">Economy</div>' +
-          '<div class="gazette-col-byline">' + esc(typeof econ === 'string' ? '' : econ.byline || '') + '</div>' +
-          '<div class="gazette-body">' + (typeof econ === 'string' ? econ : econ.content || '') + '</div>' +
-        '</div>' +
-        '<div class="gazette-col">' +
-          '<div class="gazette-col-title">Military</div>' +
-          '<div class="gazette-col-byline">' + esc(typeof mil === 'string' ? '' : mil.byline || '') + '</div>' +
-          '<div class="gazette-body">' + (typeof mil === 'string' ? mil : mil.content || '') + '</div>' +
-        '</div>' +
-      '</div>';
-
-      // Two-column grid: Society + Rankings
-      var soc = g.sections.society || {};
-      var rankingsHtml = '';
-      if (d.players && d.players.length) {
-        var sorted = d.players.slice().sort(function(a,b) { return (b.score||0) - (a.score||0); });
-        rankingsHtml = '<table>';
-        rankingsHtml += '<tr><th>#</th><th>Nation</th><th>Score</th><th>Cities</th><th>Units</th></tr>';
-        sorted.forEach(function(p, i) {
-          rankingsHtml += '<tr><td class="rank">' + (i+1) + '</td><td>' + esc(p.name) + '</td><td>' + (p.score||0) + '</td><td>' + (p.cities||0) + '</td><td>' + (p.units||0) + '</td></tr>';
-        });
-        rankingsHtml += '</table>';
-      }
-
-      bodyHtml += '<div class="gazette-cols">' +
-        '<div class="gazette-col">' +
-          '<div class="gazette-col-title">Society</div>' +
-          '<div class="gazette-col-byline">' + esc(typeof soc === 'string' ? '' : soc.byline || '') + '</div>' +
-          '<div class="gazette-body">' + (typeof soc === 'string' ? soc : soc.content || '') + '</div>' +
-        '</div>' +
-        '<div class="gazette-col">' +
-          '<div class="gazette-standings">' +
-            '<div class="gazette-standings-title">Standings</div>' +
-            rankingsHtml +
-          '</div>' +
-        '</div>' +
-      '</div>';
-
-      // Opinion column — full width
-      if (g.opinion) {
-        bodyHtml += '<div class="gazette-opinion">' +
-          '<div class="gazette-opinion-label">Opinion</div>' +
-          '<div class="gazette-opinion-col-title">' + esc(g.opinion.title) + '</div>' +
-          '<div class="gazette-opinion-title-line">' +
-            '<span class="gazette-opinion-author">' + esc(g.opinion.author) + '</span>' +
-            (g.opinion.author_title ? ' &mdash; ' + esc(g.opinion.author_title) : '') +
-          '</div>' +
-          '<div class="gazette-body">' + g.opinion.content + '</div>' +
-          '</div>';
-      }
-
-      // Letters to the editor
-      if (g.letters && g.letters.length) {
-        bodyHtml += '<div class="gazette-letters">' +
-          '<div class="gazette-letters-title">Letters to the Editor</div>';
-        g.letters.forEach(function(letter) {
-          bodyHtml += '<div class="gazette-letter">' +
-            '<p>' + letter.content + '</p>' +
-            '<div class="gazette-letter-author">&mdash; ' + esc(letter.author) + '</div>' +
-            '</div>';
-        });
-        bodyHtml += '</div>';
-      }
-
-      // Corrections
-      if (g.corrections && g.corrections !== 'null') {
-        bodyHtml += '<div class="gazette-corrections">' +
-          '<div class="gazette-corrections-title">Corrections &amp; Retractions</div>' +
-          '<p>' + g.corrections + '</p>' +
-          '</div>';
-      }
-
-      // Classifieds / Ads
-      if (g.ads && g.ads.length) {
-        bodyHtml += '<div class="gazette-ads">' +
-          '<div class="gazette-ads-title">Classifieds</div>' +
-          '<div class="gazette-ads-grid">';
-        g.ads.forEach(function(ad) {
-          var clean = ad.replace(/<[^>]*>/g,'');
-          // Bold the category prefix (e.g. "HELP WANTED:" or "FOR SALE:")
-          clean = clean.replace(/^([A-Z][A-Z\s&\/\-]+[:\u2014])/, '<strong>$1</strong>');
-          bodyHtml += '<div class="gazette-ad">' + clean + '</div>';
-        });
-        bodyHtml += '</div></div>';
-      }
-
-      // Newspaper footer
-      bodyHtml += '<div style="text-align:center;padding:14px 20px;border-top:1px solid #ccc;"><a href="/editor.html" style="font-family:Georgia,serif;font-size:13px;color:#1a1a1a;text-decoration:none;font-style:italic;">Have a tip? A proclamation? A complaint? <strong style="text-decoration:underline;">Write to the Editor</strong> &rarr;</a></div>';
-      bodyHtml += '<div class="gazette-footer">The Civ Chronicle &mdash; All the civilization that\'s fit to print</div>';
-
+    if (g.pages) {
+      bodyHtml = renderGazetteV2(g, d, esc);
+    } else if (g.sections) {
+      bodyHtml = renderGazetteV1(g, d, esc);
     } else if (g.article) {
-      // Old format fallback
-      bodyHtml = '<div style="padding:20px 32px;"><div class="gazette-headline" style="text-align:left;padding:0;margin-bottom:6px;">' + esc(g.headline) + '</div>' +
-        '<div style="font-size:11px;color:#888;font-style:italic;margin-bottom:16px;">The Civ Chronicle &middot; Turn ' + g.turn + ' &middot; ' + esc(g.year_display) + '</div>' +
-        '<div class="gazette-body">' + g.article + '</div></div>';
+      bodyHtml = renderGazetteV0(g, esc);
+    } else {
+      bodyHtml = '<div class="gazette-v0-article"><p><em>Edition format not recognised.</em></p></div>';
     }
 
     // Highlight player names in all gazette content
@@ -876,6 +1197,20 @@
           '<div class="gazette-inprint-spinner"></div>' +
         '</div>';
     }
+    // For v2 entries the masthead lives INSIDE page 1 (so it flips with
+    // the page). For v0/v1 the masthead sits at the top of the wrapper
+    // as before — those layouts don't flip.
+    var wrapperMasthead = '';
+    if (!g.pages) {
+      wrapperMasthead =
+        '<div class="gazette-masthead">' +
+          '<div class="gazette-masthead-name">The Civ Chronicle</div>' +
+          '<div class="gazette-masthead-sub">All the civilization that\'s fit to print</div>' +
+          '<hr class="gazette-masthead-rule">' +
+          '<div class="gazette-masthead-meta"><span>Turn ' + g.turn + '</span><span>' + esc(g.year_display) + '</span><span>Vol. I, No. ' + g.turn + '</span></div>' +
+        '</div>';
+    }
+
     sec.innerHTML = '<section id="gazette"><div class="section-head"><h2>The Civ Chronicle</h2><div class="line"></div></div>' +
       '<div class="hl-nav">' +
       '<button id="gz-prev" ' + (gazetteTurn <= 0 ? 'disabled' : '') + '>&larr;</button>' +
@@ -884,12 +1219,7 @@
       '<button id="gz-next" ' + (gazetteTurn >= entries.length - 1 ? 'disabled' : '') + '>&rarr;</button>' +
       '</div>' +
       '<div class="gazette" id="gazette-print-root">' +
-        '<div class="gazette-masthead">' +
-          '<div class="gazette-masthead-name">The Civ Chronicle</div>' +
-          '<div class="gazette-masthead-sub">All the civilization that\'s fit to print</div>' +
-          '<hr class="gazette-masthead-rule">' +
-          '<div class="gazette-masthead-meta"><span>Turn ' + g.turn + '</span><span>' + esc(g.year_display) + '</span><span>Vol. I, No. ' + g.turn + '</span></div>' +
-        '</div>' +
+        wrapperMasthead +
         inPrintBanner +
         bodyHtml +
       '</div></section>';
@@ -903,7 +1233,967 @@
     document.getElementById('gz-pdf').addEventListener('click', function() {
       exportGazettePdf(g);
     });
+
+    // Page-flip retired — v2 now renders as one long scrolling broadsheet.
+    // initGazetteFlipbook + paginateGazette + markSoloRows + the cascade
+    // rebalance passes are kept in source for now (no harm; not invoked).
+
+    // Easter eggs (frontend-only — no AI involvement). Deterministic per
+    // turn so the same edition always shows the same eggs.
+    applyGazetteEasterEggs(g);
   }
+
+  // ---------------------------------------------------------------------
+  // Custom CSS-3D page flip. Pages are absolute-positioned and stacked.
+  // Each page carries a data-state:
+  //   - "current"  → visible, rotateY(0), z-index 3
+  //   - "next"     → sitting under the current page, opacity 0
+  //   - "prev"     → already turned to the left stack, rotateY(-180)
+  // Transitioning forward sets `flipping-out` on the outgoing page (CSS
+  // animates rotateY → -180) while the next page becomes `current`.
+  // Transitioning backward instantly snaps the incoming page from prev
+  // back to current — no animation flourish, just a quick swap.
+  //
+  // The book container's height is set to the tallest page so it doesn't
+  // collapse when we absolute-position everything.
+  // ---------------------------------------------------------------------
+  var _gazetteFlipState = null;
+
+  // Soft target for pagination — pages naturally exceeding this trigger
+  // a section split into a new page. The actual book height is then set
+  // to whatever the tallest *resulting* page measures, so no content
+  // gets clipped even if a single section won't break (e.g. a tall
+  // crossword). Pages shorter than the max simply have whitespace at
+  // the bottom; flipping never causes layout shift below the gazette.
+  var GAZETTE_PAGE_TARGET = 1180;
+
+  function initGazetteFlipbook(g) {
+    var book = document.getElementById('gazette-book');
+    if (!book) return;
+
+    // Tear down any prior keyboard listener (rendering a different
+    // edition would otherwise stack handlers).
+    document.removeEventListener('keydown', _gazetteKeyHandler);
+
+    // Wait for all images inside the book to finish loading before
+    // measuring page heights. Otherwise pages measure short (images
+    // are 0×0 placeholders), the book is sized too small, then images
+    // pop in and content overflows — gets clipped by overflow:hidden.
+    var images = Array.prototype.slice.call(book.querySelectorAll('img'));
+    var unfinished = images.filter(function(img) { return !img.complete; });
+    if (unfinished.length === 0) {
+      _doInitFlipbook(book, g);
+      return;
+    }
+    var remaining = unfinished.length;
+    function done() {
+      remaining--;
+      if (remaining <= 0) _doInitFlipbook(book, g);
+    }
+    unfinished.forEach(function(img) {
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+    // Belt-and-suspenders: don't wait forever if a network image hangs.
+    setTimeout(function() { if (remaining > 0) _doInitFlipbook(book, g); }, 4000);
+  }
+
+  function _doInitFlipbook(book, g) {
+    if (book.classList.contains('is-flippable')) return; // guard against double-init from the timeout
+
+    // Step 1: paginate while pages are still in normal flow. Column
+    // layout is active (CSS applies it to .gazette-page unconditionally)
+    // so scrollHeight reflects the actual rendered height per page.
+    paginateGazette(book, GAZETTE_PAGE_TARGET);
+
+    // Step 1b: detect single-column sections that end up alone in their
+    // visual row (nothing in the other column) and mark them so CSS can
+    // promote them to span the full page width — wasted whitespace is
+    // worse than a wide article.
+    markSoloRows(book);
+
+    // Step 2: measure each page's natural height (with images loaded).
+    var pages = Array.prototype.slice.call(book.querySelectorAll('.gazette-page'));
+    if (!pages.length) return;
+    var maxPageHeight = pages.reduce(function(m, p) {
+      return Math.max(m, p.offsetHeight);
+    }, 0);
+    maxPageHeight = maxPageHeight + 16;  // small pad for rounding
+
+    // Step 3: atomically lock the book height + switch into flippable
+    // mode. Pages absolute-position via CSS, fill 100% of the book.
+    book.style.height = maxPageHeight + 'px';
+    book.classList.add('is-flippable');
+
+    // Pages no longer carry an inline "Page N of M" line — the running
+    // head (or masthead on page 1) handles that. Just update the running
+    // head's page number on auto-paginated pages so it's correct.
+    pages.forEach(function(p, i) {
+      var rh = p.querySelector('.gazette-runninghead');
+      if (rh) {
+        var spans = rh.querySelectorAll('span');
+        if (spans.length >= 3) spans[2].textContent = 'Page ' + (i + 1);
+      }
+    });
+
+    // Initial state: page 0 current, page 1 next, rest prev (off-stack).
+    pages.forEach(function(p, i) {
+      p.dataset.state = i === 0 ? 'current' : (i === 1 ? 'next' : 'prev');
+    });
+
+    _gazetteFlipState = { book: book, pages: pages, idx: 0, busy: false };
+
+    // Both control bars (top + bottom) get wired in parallel.
+    var prevBtns = document.querySelectorAll('[id^="gz-pageprev"]');
+    var nextBtns = document.querySelectorAll('[id^="gz-pagenext"]');
+    var inds     = document.querySelectorAll('[id^="gz-pageindicator"]');
+    function refreshIndicator() {
+      var label = (_gazetteFlipState.idx + 1) + ' / ' + pages.length;
+      inds.forEach(function(el) { el.textContent = label; });
+      prevBtns.forEach(function(b) { b.disabled = _gazetteFlipState.idx <= 0; });
+      nextBtns.forEach(function(b) { b.disabled = _gazetteFlipState.idx >= pages.length - 1; });
+    }
+    refreshIndicator();
+    nextBtns.forEach(function(b) { b.addEventListener('click', function() { flipForward(refreshIndicator); }); });
+    prevBtns.forEach(function(b) { b.addEventListener('click', function() { flipBack(refreshIndicator); }); });
+
+    document.addEventListener('keydown', _gazetteKeyHandler);
+  }
+
+  // After pagination, walk each page in DOM order and identify any
+  // single-column section that ends up alone in its visual row (i.e.,
+  // the other column would be empty). Mark it with gz-row-solo so CSS
+  // promotes it to grid-column: 1 / -1. Without this, articles like
+  // the trailing "From the Frozen South" left an awkward empty right
+  // column on page 3.
+  //
+  // We mimic grid-auto-flow:dense over a 2-column track:
+  //   - Span-all elements (masthead, runninghead, lead, ads, etc.)
+  //     close the current row and don't pair with anything.
+  //   - Single-col elements fill (col1, col2, col1, col2, ...). When
+  //     a row only collects one before being closed by a span-all or
+  //     end-of-page, that one is solo.
+  function markSoloRows(book) {
+    var SPAN_KINDS = ['gazette-masthead', 'gazette-runninghead',
+      'gz-kind-lead', 'gz-kind-puzzle', 'gz-kind-letters',
+      'gz-kind-ads', 'gz-kind-breaking', 'gz-kind-obituary',
+      'gz-kind-corrections', 'gz-weather-rich',
+      'gz-standalone-img', 'gazette-page-jump'];
+    // Any single-col section that ends up alone in its row gets
+    // promoted to full width. The previous allowlist (long-form prose
+    // only) left small features like sports/marketplace/lottery sitting
+    // in a column with an empty cell next to them, which looks worse
+    // than a wide section. CSS gives promoted bodies multi-column
+    // flow so the content doesn't stretch awkwardly.
+    function isSpanAll(el) {
+      for (var i = 0; i < SPAN_KINDS.length; i++) {
+        if (el.classList.contains(SPAN_KINDS[i])) return true;
+      }
+      return false;
+    }
+    // Anything that's a section (and not already span-all) is
+    // promotable to full-width when alone — empty cells look worse
+    // than a wide section.
+    function isPromotable(el) {
+      return el.classList.contains('gz-section');
+    }
+    Array.prototype.forEach.call(book.querySelectorAll('.gazette-page'), function(page) {
+      Array.prototype.forEach.call(page.querySelectorAll('.gz-row-solo'), function(el) {
+        el.classList.remove('gz-row-solo');
+      });
+      var rowItems = [];
+      function flushRow() {
+        if (rowItems.length === 1 && isPromotable(rowItems[0])) {
+          rowItems[0].classList.add('gz-row-solo');
+        }
+        rowItems = [];
+      }
+      Array.prototype.forEach.call(page.children, function(el) {
+        if (isSpanAll(el)) {
+          flushRow();
+        } else {
+          rowItems.push(el);
+          if (rowItems.length === 2) flushRow();
+        }
+      });
+      flushRow();
+    });
+  }
+
+  // Auto-pagination. Walks each page and, while it overflows the
+  // configured height, peels its trailing section off into a new page
+  // appended immediately after. The lead and breaking sections never
+  // get pushed (they're page-1 anchors); everything else can migrate.
+  //
+  // The page-number header is preserved at the top of each page; new
+  // pages get a freshly-cloned header.
+  function paginateGazette(book, maxH) {
+    function listPages() { return Array.prototype.slice.call(book.querySelectorAll('.gazette-page')); }
+    // Find a running-head template — any existing page 2+ has one. We
+    // clone this onto auto-created pages so they're visually consistent.
+    var runningHeadTemplate = null;
+    listPages().slice(1).some(function(p) {
+      var rh = p.querySelector('.gazette-runninghead');
+      if (rh) { runningHeadTemplate = rh; return true; }
+    });
+    function newPage(afterPage) {
+      var p = document.createElement('div');
+      p.className = 'gazette-page';
+      if (runningHeadTemplate) {
+        p.appendChild(runningHeadTemplate.cloneNode(true));
+      }
+      afterPage.parentNode.insertBefore(p, afterPage.nextSibling);
+      return p;
+    }
+    function headerEl(page) {
+      // The "header" is whichever of: full masthead | running head | (legacy) page-number
+      // sits at the top of the page. Anything we re-flow goes BELOW it.
+      return page.querySelector('.gazette-masthead') ||
+             page.querySelector('.gazette-runninghead') ||
+             page.querySelector('.gazette-page-number');
+    }
+    var pages = listPages();
+    var safety = 50;   // hard ceiling to avoid runaways
+    // Pass 0: relocate breaking sections that landed on a long page.
+    // Breaking is meant to be a short wire-dispatch sidebar — when the
+    // AI puts it on page 1 alongside lead+column, page 1 overflows and
+    // Pass 1 peels breaking onto page 2, where it inflates an already-
+    // dense page. Move any breaking section to whichever existing page
+    // has the most room (lowest scrollHeight), as long as that page
+    // has space to take it.
+    pages = listPages();
+    Array.prototype.forEach.call(book.querySelectorAll('.gz-kind-breaking'), function(brk) {
+      var brkPage = brk.closest('.gazette-page');
+      if (!brkPage) return;
+      // Find the shortest OTHER page that can take it without exceeding maxH.
+      var bestPage = null, bestH = Infinity;
+      pages.forEach(function(p) {
+        if (p === brkPage) return;
+        var h = p.scrollHeight;
+        if (h < bestH) { bestH = h; bestPage = p; }
+      });
+      if (!bestPage) return;
+      // Only relocate if the source page would benefit (is currently the tallest)
+      // and the destination has room.
+      var srcH = brkPage.scrollHeight;
+      if (srcH <= bestH + 100) return; // source isn't appreciably taller — leave it
+      var bestHeader = headerEl(bestPage);
+      // Insert at bottom of destination so it doesn't disrupt the lead
+      // story or other anchors there.
+      var brkJump = bestPage.querySelector('.gazette-page-jump');
+      if (brkJump) bestPage.insertBefore(brk, brkJump);
+      else bestPage.appendChild(brk);
+      console.log('[gazette] Pass 0 moved breaking from page', pages.indexOf(brkPage)+1, '→', pages.indexOf(bestPage)+1);
+    });
+    // Pass 1: overflow split. Push trailing sections off pages that
+    // exceed maxH onto the next page (creating one if needed). Prefer
+    // peeling non-breaking sections — breaking is small and re-locatable
+    // by Pass 0, so leaving it in place keeps page anchors stable.
+    for (var i = 0; i < pages.length && safety > 0; i++) {
+      var page = pages[i];
+      while (page.scrollHeight > maxH && safety-- > 0) {
+        var sections = Array.prototype.slice.call(page.children).filter(function(el) {
+          return !el.classList.contains('gazette-page-number') &&
+                 !el.classList.contains('gazette-page-jump') &&
+                 !el.classList.contains('gazette-masthead') &&
+                 !el.classList.contains('gazette-runninghead');
+        });
+        if (sections.length <= 1) break; // single section taller than a page — accept overflow
+        // Prefer to peel a non-breaking trailing section. Walk back to
+        // find the last non-breaking; only peel breaking if nothing else.
+        var last = null;
+        for (var s = sections.length - 1; s >= 0; s--) {
+          if (!sections[s].classList.contains('gz-kind-breaking')) {
+            last = sections[s];
+            break;
+          }
+        }
+        if (!last) last = sections[sections.length - 1];
+        var nextPage = pages[i + 1];
+        if (!nextPage) {
+          nextPage = newPage(page);
+          pages = listPages();
+        }
+        var nextHeader = headerEl(nextPage);
+        if (nextHeader) nextPage.insertBefore(last, nextHeader.nextSibling);
+        else nextPage.insertBefore(last, nextPage.firstChild);
+      }
+    }
+    // Pass 2: balance. Pull the FIRST section of page N+1 back onto
+    // page N if it fits — repeat until no more pulls possible. This
+    // prevents the "sparse page" problem where a single section ends
+    // up alone on its own page.
+    safety = 200;
+    var changed = true;
+    while (changed && safety-- > 0) {
+      changed = false;
+      pages = listPages();
+      for (var i = 0; i < pages.length - 1; i++) {
+        var current = pages[i];
+        var next = pages[i + 1];
+        // First non-header section on next page.
+        var nextSections = Array.prototype.slice.call(next.children).filter(function(el) {
+          return !el.classList.contains('gazette-page-number') &&
+                 !el.classList.contains('gazette-page-jump') &&
+                 !el.classList.contains('gazette-masthead') &&
+                 !el.classList.contains('gazette-runninghead');
+        });
+        if (!nextSections.length) continue;
+        var candidate = nextSections[0];
+        // Provisionally append to current page and see if it fits.
+        var beforeHeight = current.scrollHeight;
+        var jump = current.querySelector('.gazette-page-jump');
+        if (jump) current.insertBefore(candidate, jump);
+        else current.appendChild(candidate);
+        if (current.scrollHeight > maxH) {
+          // Doesn't fit — put it back.
+          var nextFirst = headerEl(next);
+          if (nextFirst) next.insertBefore(candidate, nextFirst.nextSibling);
+          else next.insertBefore(candidate, next.firstChild);
+        } else {
+          changed = true;
+        }
+      }
+      // Drop pages that are now empty (only header remaining).
+      pages = listPages();
+      pages.forEach(function(p) {
+        var contentSections = Array.prototype.slice.call(p.children).filter(function(el) {
+          return !el.classList.contains('gazette-page-number') &&
+                 !el.classList.contains('gazette-page-jump') &&
+                 !el.classList.contains('gazette-masthead') &&
+                 !el.classList.contains('gazette-runninghead');
+        });
+        if (contentSections.length === 0 && p.parentNode) {
+          p.parentNode.removeChild(p);
+          changed = true;
+        }
+      });
+    }
+    // Pass 3: rebalance heights — runs LAST so nothing undoes it. If
+    // page N is materially taller than page N+1, push its trailing
+    // section forward to even things out. The book's height is locked
+    // to the tallest page, so a single tall page leaves dead space on
+    // every other page. The move is accepted only if it strictly
+    // reduces max(N, N+1).
+    console.log('[gazette] Pass 3 (rebalance) starting; page heights:',
+      listPages().map(function(p) { return p.scrollHeight; }));
+    safety = 200;
+    var rebalanced = true;
+    while (rebalanced && safety-- > 0) {
+      rebalanced = false;
+      pages = listPages();
+      for (var i = 0; i < pages.length - 1; i++) {
+        var cur = pages[i];
+        var nxt = pages[i + 1];
+        var diff = cur.scrollHeight - nxt.scrollHeight;
+        if (diff < 80) continue;
+        var contentSections = Array.prototype.slice.call(cur.children).filter(function(el) {
+          return !el.classList.contains('gazette-page-number') &&
+                 !el.classList.contains('gazette-page-jump') &&
+                 !el.classList.contains('gazette-masthead') &&
+                 !el.classList.contains('gazette-runninghead');
+        });
+        if (contentSections.length < 2) {
+          console.log('[gazette] Pass 3 page', i+1, 'taller by', diff, 'but only', contentSections.length, 'movable section(s) — skip');
+          continue;
+        }
+        var movable = contentSections[contentSections.length - 1];
+        var beforeMax = Math.max(cur.scrollHeight, nxt.scrollHeight);
+        var nxtHeader = headerEl(nxt);
+        if (nxtHeader) nxt.insertBefore(movable, nxtHeader.nextSibling);
+        else nxt.insertBefore(movable, nxt.firstChild);
+        var afterMax = Math.max(cur.scrollHeight, nxt.scrollHeight);
+        if (afterMax >= beforeMax) {
+          var jump = cur.querySelector('.gazette-page-jump');
+          if (jump) cur.insertBefore(movable, jump);
+          else cur.appendChild(movable);
+          console.log('[gazette] Pass 3 page', i+1, '→', i+2, 'no improvement (',
+            beforeMax, '→', afterMax, ') — restored', movable.className);
+        } else {
+          rebalanced = true;
+          console.log('[gazette] Pass 3 page', i+1, '→', i+2, 'kept move of', movable.className,
+            '— max', beforeMax, '→', afterMax);
+        }
+      }
+    }
+    console.log('[gazette] Pass 3 done; final heights:',
+      listPages().map(function(p) { return p.scrollHeight; }));
+
+    // Pass 4: cascade fill. Pairwise Pass 3 misses cases where moving
+    // page 1's trailing content to page 5 would help — but moves only
+    // happen between adjacent pages, and intermediate pages are already
+    // at capacity. So instead: walk all pages, compute average height
+    // as the ideal, and for each page that's much SHORTER than average,
+    // pull content forward from earlier pages (cascade). The receiving
+    // page won't exceed the original max, so the book height never
+    // grows.
+    pages = listPages();
+    var totalH = pages.reduce(function(s, p) { return s + p.scrollHeight; }, 0);
+    var avgH = totalH / pages.length;
+    var origMax = pages.reduce(function(m, p) { return Math.max(m, p.scrollHeight); }, 0);
+    console.log('[gazette] Pass 4 (cascade) avg=', Math.round(avgH), 'max=', origMax);
+    safety = 200;
+    var cascaded = true;
+    while (cascaded && safety-- > 0) {
+      cascaded = false;
+      pages = listPages();
+      // Find the SHORTEST page (the one with most empty space).
+      var shortIdx = 0;
+      for (var k = 1; k < pages.length; k++) {
+        if (pages[k].scrollHeight < pages[shortIdx].scrollHeight) shortIdx = k;
+      }
+      // Try to fill it by pulling sections forward from any earlier page.
+      // Walk earlier pages in reverse order (closest first).
+      var shortPage = pages[shortIdx];
+      var pulled = false;
+      for (var src = shortIdx - 1; src >= 0 && !pulled; src--) {
+        var srcPage = pages[src];
+        var srcSections = Array.prototype.slice.call(srcPage.children).filter(function(el) {
+          return !el.classList.contains('gazette-page-number') &&
+                 !el.classList.contains('gazette-page-jump') &&
+                 !el.classList.contains('gazette-masthead') &&
+                 !el.classList.contains('gazette-runninghead');
+        });
+        if (srcSections.length < 2) continue;
+        // Move srcSections[last] from srcPage forward through every page
+        // until it lands on shortPage. Each intermediate move displaces
+        // that page's last section forward too — chain reaction.
+        for (var step = src; step < shortIdx; step++) {
+          var fromPage = pages[step];
+          var toPage = pages[step + 1];
+          var fromSections = Array.prototype.slice.call(fromPage.children).filter(function(el) {
+            return !el.classList.contains('gazette-page-number') &&
+                   !el.classList.contains('gazette-page-jump') &&
+                   !el.classList.contains('gazette-masthead') &&
+                   !el.classList.contains('gazette-runninghead');
+          });
+          if (fromSections.length < 2) break;
+          var moving = fromSections[fromSections.length - 1];
+          var toHeader = headerEl(toPage);
+          if (toHeader) toPage.insertBefore(moving, toHeader.nextSibling);
+          else toPage.insertBefore(moving, toPage.firstChild);
+        }
+        // Verify: did the chain make any page exceed origMax? If yes, undo.
+        var newMax = pages.reduce(function(m, p) { return Math.max(m, p.scrollHeight); }, 0);
+        if (newMax > origMax) {
+          // Walk back the chain — pop the first section of each page back to the previous.
+          for (var step2 = shortIdx; step2 > src; step2--) {
+            var pToPage = pages[step2];
+            var pFromPage = pages[step2 - 1];
+            var pToSections = Array.prototype.slice.call(pToPage.children).filter(function(el) {
+              return !el.classList.contains('gazette-page-number') &&
+                     !el.classList.contains('gazette-page-jump') &&
+                     !el.classList.contains('gazette-masthead') &&
+                     !el.classList.contains('gazette-runninghead');
+            });
+            if (!pToSections.length) break;
+            var goingBack = pToSections[0];
+            var jump = pFromPage.querySelector('.gazette-page-jump');
+            if (jump) pFromPage.insertBefore(goingBack, jump);
+            else pFromPage.appendChild(goingBack);
+          }
+          console.log('[gazette] Pass 4 chain from page', src+1, '→', shortIdx+1, 'rejected (newMax', newMax, '> origMax', origMax, ')');
+        } else {
+          pulled = true;
+          cascaded = true;
+          console.log('[gazette] Pass 4 chain from page', src+1, '→', shortIdx+1,
+            'kept; heights now', listPages().map(function(p) { return p.scrollHeight; }));
+        }
+      }
+    }
+    console.log('[gazette] Pass 4 done; final heights:',
+      listPages().map(function(p) { return p.scrollHeight; }));
+  }
+
+  function flipForward(after) {
+    var s = _gazetteFlipState;
+    if (!s || s.busy || s.idx >= s.pages.length - 1) return;
+    s.busy = true;
+    var current = s.pages[s.idx];
+    var nextPage = s.pages[s.idx + 1];
+    // Outgoing page peels left. Incoming becomes current immediately so
+    // it's revealed underneath as the outgoing rotates.
+    current.dataset.state = 'flipping-out';
+    nextPage.dataset.state = 'current';
+    s.idx += 1;
+    setTimeout(function() {
+      current.dataset.state = 'prev';
+      // Whatever's now after the new current becomes the next-up.
+      var following = s.pages[s.idx + 1];
+      if (following) following.dataset.state = 'next';
+      s.busy = false;
+      if (after) after();
+    }, 720);
+  }
+
+  function flipBack(after) {
+    var s = _gazetteFlipState;
+    if (!s || s.busy || s.idx <= 0) return;
+    s.busy = true;
+    var current = s.pages[s.idx];
+    var prevPage = s.pages[s.idx - 1];
+    // Going back: current page slides back into the "next" stack (which
+    // sits hidden under the previous page); previous page rotates from
+    // the left stack back to current. Both transitions animate via the
+    // existing CSS transition on transform/opacity.
+    current.dataset.state = 'next';
+    prevPage.dataset.state = 'current';
+    s.idx -= 1;
+    setTimeout(function() {
+      s.busy = false;
+      if (after) after();
+    }, 720);
+  }
+
+  function _gazetteKeyHandler(ev) {
+    if (!_gazetteFlipState) return;
+    var tag = ev.target && ev.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (ev.key === 'PageDown') { flipForward(); ev.preventDefault(); }
+    else if (ev.key === 'PageUp') { flipBack(); ev.preventDefault(); }
+  }
+
+  // Stacked-pages fallback for mobile / single-page editions: smooth-scroll
+  // the prev/next buttons between page sections.
+  function wireV2PageNavigation() {
+    var prev = document.getElementById('gz-pageprev');
+    var next = document.getElementById('gz-pagenext');
+    var pages = document.querySelectorAll('.gazette-page');
+    if (!pages.length) return;
+    function pageInView() {
+      var topRef = window.scrollY + 80;
+      var idx = 0;
+      pages.forEach(function(p, i) {
+        if (p.offsetTop <= topRef) idx = i;
+      });
+      return idx;
+    }
+    function scrollToPage(i) {
+      i = Math.max(0, Math.min(pages.length - 1, i));
+      pages[i].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (prev) prev.addEventListener('click', function() { scrollToPage(pageInView() - 1); });
+    if (next) next.addEventListener('click', function() { scrollToPage(pageInView() + 1); });
+  }
+
+  // ---------------------------------------------------------------------
+  // Easter eggs — frontend-only, deterministic per turn so a given edition
+  // always shows the same eggs.
+  //
+  //   - coffee stain   : 1/20 editions (turn % 20 === 7), CSS-overlaid ring
+  //   - hidden settler : every 5th edition, small glyph in a corner of
+  //                      the last page; click → toast
+  //   - Konami code    : ↑↑↓↓←→←→BA on the gazette toggles a tabloid skin
+  // ---------------------------------------------------------------------
+
+  function applyGazetteEasterEggs(g) {
+    var root = document.getElementById('gazette-print-root');
+    if (!root) return;
+    var turn = g.turn || 0;
+
+    // Coffee stain — pseudo-random offset by turn so it's not always
+    // top-right, but stays where it is for that edition.
+    if (turn > 0 && (turn % 20 === 7)) {
+      root.classList.add('gz-coffee-stain');
+    }
+
+    // Hidden settler on every 5th edition (and only if we have pages
+    // to put it on — the lone-page v0/v1 layouts get it too).
+    if (turn > 0 && (turn % 5 === 0)) {
+      var pages = root.querySelectorAll('.gazette-page');
+      var host = pages.length ? pages[pages.length - 1] : root;
+      if (host && getComputedStyle(host).position === 'static') {
+        host.style.position = 'relative';
+      }
+      if (host) {
+        var settler = document.createElement('span');
+        settler.className = 'gz-hidden-settler';
+        settler.title = '';  // empty so the surprise lands on click
+        settler.textContent = '♟';  // ♟ chess pawn
+        // Pseudo-random placement seeded by turn.
+        var seed = (turn * 9301 + 49297) % 233280;
+        var x = 12 + (seed % 280);
+        var y = 80 + ((seed * 7) % 480);
+        settler.style.left = x + 'px';
+        settler.style.top = y + 'px';
+        settler.addEventListener('click', function() {
+          showGazetteToast('You found the settler. The frontier salutes you.');
+          settler.style.opacity = '0';
+        });
+        host.appendChild(settler);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Crossword builder. The AI gives us {word, clue} entries and we do
+  // the actual grid layout here (text models can't reliably hand-place
+  // intersecting words). Algorithm is a greedy first-fit:
+  //   1. Place the longest word horizontally at row 0.
+  //   2. For each subsequent word, scan every existing letter on the
+  //      grid; if the new word shares that letter, try placing it
+  //      vertically (or horizontally if existing is vertical) so the
+  //      shared letter overlaps.
+  //   3. Reject placements that conflict with existing letters or that
+  //      would create unintended adjacency (a sideways letter touching
+  //      another word).
+  //   4. Words that can't be placed are silently dropped — they don't
+  //      appear in the final clue list.
+  // Result: every clue printed corresponds to a real word in the grid.
+  // ---------------------------------------------------------------------
+
+  function buildCrossword(entries) {
+    var clean = (entries || [])
+      .map(function(e) {
+        return { word: String(e.word || '').toUpperCase().replace(/[^A-Z]/g, ''), clue: e.clue || '' };
+      })
+      .filter(function(e) { return e.word.length >= 3 && e.word.length <= 12 && e.clue; });
+    if (!clean.length) return null;
+    clean.sort(function(a, b) { return b.word.length - a.word.length; });
+
+    var grid = {};                             // "r,c" → letter
+    var placed = [];                           // [{word, clue, row, col, dir}]
+    var key = function(r, c) { return r + ',' + c; };
+
+    function placeWord(word, row, col, dir) {
+      for (var i = 0; i < word.length; i++) {
+        var r = row + (dir === 'down' ? i : 0);
+        var c = col + (dir === 'across' ? i : 0);
+        grid[key(r, c)] = word[i];
+      }
+    }
+
+    function canPlace(word, row, col, dir) {
+      var dr = dir === 'down' ? 1 : 0;
+      var dc = dir === 'across' ? 1 : 0;
+      // Cell just before the start and just after the end must be empty
+      if (grid[key(row - dr, col - dc)]) return false;
+      if (grid[key(row + dr * word.length, col + dc * word.length)]) return false;
+      var hasIntersection = false;
+      for (var i = 0; i < word.length; i++) {
+        var r = row + dr * i, c = col + dc * i;
+        var existing = grid[key(r, c)];
+        if (existing) {
+          if (existing !== word[i]) return false;
+          hasIntersection = true;
+        } else {
+          // Adjacency check perpendicular to the word: the new letter
+          // shouldn't touch an unrelated letter sideways.
+          if (dir === 'down') {
+            if (grid[key(r, c - 1)] || grid[key(r, c + 1)]) return false;
+          } else {
+            if (grid[key(r - 1, c)] || grid[key(r + 1, c)]) return false;
+          }
+        }
+      }
+      return hasIntersection;
+    }
+
+    // Place first word horizontal at the origin.
+    var first = clean[0];
+    placeWord(first.word, 0, 0, 'across');
+    placed.push({ word: first.word, clue: first.clue, row: 0, col: 0, dir: 'across' });
+
+    // Try to place each remaining word.
+    for (var w = 1; w < clean.length; w++) {
+      var entry = clean[w];
+      var didPlace = false;
+      // Scan existing cells for shared letters.
+      var keys = Object.keys(grid);
+      for (var k = 0; k < keys.length && !didPlace; k++) {
+        var pos = keys[k].split(',');
+        var pr = +pos[0], pc = +pos[1];
+        var existingLetter = grid[keys[k]];
+        // For each character of the new word matching that letter, try
+        // perpendicular placement.
+        for (var li = 0; li < entry.word.length && !didPlace; li++) {
+          if (entry.word[li] !== existingLetter) continue;
+          // Try down-orientation: word starts at (pr - li, pc)
+          if (canPlace(entry.word, pr - li, pc, 'down')) {
+            placeWord(entry.word, pr - li, pc, 'down');
+            placed.push({ word: entry.word, clue: entry.clue, row: pr - li, col: pc, dir: 'down' });
+            didPlace = true;
+            break;
+          }
+          // Try across-orientation: word starts at (pr, pc - li)
+          if (canPlace(entry.word, pr, pc - li, 'across')) {
+            placeWord(entry.word, pr, pc - li, 'across');
+            placed.push({ word: entry.word, clue: entry.clue, row: pr, col: pc - li, dir: 'across' });
+            didPlace = true;
+            break;
+          }
+        }
+      }
+      // If we couldn't place it, drop silently.
+    }
+
+    // Number the cells where words start (sorted top-to-bottom, then left-to-right).
+    var starts = placed.slice().sort(function(a, b) {
+      return a.row - b.row || a.col - b.col;
+    });
+    var numbers = {};
+    var n = 0;
+    starts.forEach(function(p) {
+      var k = key(p.row, p.col);
+      if (!numbers[k]) {
+        n++;
+        numbers[k] = n;
+      }
+      p.number = numbers[k];
+    });
+
+    return { grid: grid, placed: placed, numbers: numbers };
+  }
+
+  function renderCrossword(entries, esc, turn) {
+    var built = buildCrossword(entries);
+    if (!built || !built.placed.length) return '<p>(crossword data invalid)</p>';
+
+    // Find grid bounds.
+    var rows = [], cols = [];
+    Object.keys(built.grid).forEach(function(k) {
+      var p = k.split(',');
+      rows.push(+p[0]); cols.push(+p[1]);
+    });
+    var minR = Math.min.apply(null, rows), maxR = Math.max.apply(null, rows);
+    var minC = Math.min.apply(null, cols), maxC = Math.max.apply(null, cols);
+
+    // Stable id for this puzzle instance — multiple crosswords on the
+    // same page need disjoint cell IDs so reveal clicks don't cross over.
+    var pid = 'xw-' + Math.random().toString(36).slice(2, 8);
+
+    // Map each cell coordinate → list of placed-entry indices it belongs
+    // to. The reveal handler looks up cells by this attribute.
+    var cellWords = {};
+    built.placed.forEach(function(p, idx) {
+      for (var i = 0; i < p.word.length; i++) {
+        var r = p.row + (p.dir === 'down' ? i : 0);
+        var c = p.col + (p.dir === 'across' ? i : 0);
+        var k = r + ',' + c;
+        if (!cellWords[k]) cellWords[k] = [];
+        cellWords[k].push(idx);
+      }
+    });
+
+    var nCols = (maxC - minC + 1);
+    var nRows = (maxR - minR + 1);
+    var gridStyle = 'grid-template-columns:repeat(' + nCols + ',var(--cell));' +
+                    'grid-template-rows:repeat(' + nRows + ',var(--cell));';
+    var html = '<div class="gz-xword" style="' + gridStyle + '">';
+    for (var r = minR; r <= maxR; r++) {
+      for (var c = minC; c <= maxC; c++) {
+        var k = r + ',' + c;
+        var letter = built.grid[k];
+        var num = built.numbers[k];
+        if (letter) {
+          var wordsAttr = (cellWords[k] || []).join(',');
+          html += '<div class="gz-xword-cell" id="' + pid + '-c-' + r + '-' + c + '" data-words="' + wordsAttr + '">' +
+            (num ? '<span class="gz-xword-num">' + num + '</span>' : '') +
+            '<span class="gz-xword-letter">' + letter + '</span>' +
+          '</div>';
+        } else {
+          html += '<div class="gz-xword-black"></div>';
+        }
+      }
+    }
+    html += '</div>';
+
+    var across = built.placed
+      .map(function(p, idx) { return { p: p, idx: idx }; })
+      .filter(function(x) { return x.p.dir === 'across'; })
+      .sort(function(a, b) { return a.p.number - b.p.number; });
+    var down = built.placed
+      .map(function(p, idx) { return { p: p, idx: idx }; })
+      .filter(function(x) { return x.p.dir === 'down'; })
+      .sort(function(a, b) { return a.p.number - b.p.number; });
+    function clueListHtml(label, items) {
+      if (!items.length) return '';
+      return '<div class="gz-xword-cluecol">' +
+        '<h4>' + label + '</h4>' +
+        items.map(function(x) {
+          return '<div class="gz-xword-clue" data-puzzle="' + pid + '" data-word="' + x.idx + '">' +
+            '<strong>' + x.p.number + '.</strong>' +
+            '<span class="gz-xword-cluetext">' + esc(x.p.clue) + '</span>' +
+            '<button class="gz-xword-reveal" type="button" data-puzzle="' + pid + '" data-word="' + x.idx + '">reveal</button>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
+    var cluesHtml = '<div class="gz-xword-clues">' + clueListHtml('Across', across) + clueListHtml('Down', down) + '</div>';
+    // Reset is the only control left — "Reveal all" was retired (it
+    // was an easy escape from the cooldown that defeated the puzzle).
+    var controlsHtml = '<div class="gz-xword-controls">' +
+      '<button type="button" class="gz-xword-reset" data-puzzle="' + pid + '">Reset</button>' +
+    '</div>';
+
+    // Wire click handlers asynchronously — the HTML is about to be
+    // injected, but DOM handlers can't be attached inline with classic
+    // JS. Defer to a microtask after innerHTML is set.
+    setTimeout(function() { wireCrosswordControls(pid, turn); }, 0);
+
+    // Layout: grid + clues side-by-side ("board"), controls below the
+    // whole thing in their own row.
+    return '<div class="gz-xword-wrap" data-puzzle="' + pid + '" data-turn="' + (turn || '') + '">' +
+      '<div class="gz-xword-board">' + html + cluesHtml + '</div>' +
+      controlsHtml +
+    '</div>';
+  }
+
+  // Wires reveal/reset buttons for one crossword instance (puzzle id).
+  // Reveal cooldown: a single rate-limit window across all crosswords
+  // and all reveal buttons (including "Reveal all"). Stored timestamp
+  // is local-only — no server-side enforcement, this is just a soft
+  // nudge to keep the puzzle fun by making players think before peeking.
+  var REVEAL_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+  var REVEAL_COOLDOWN_KEY = 'gazette-last-reveal';
+  function _readReveal() {
+    try { return parseInt(localStorage.getItem(REVEAL_COOLDOWN_KEY) || '0', 10); }
+    catch (e) { return 0; }
+  }
+  function _writeReveal(ts) {
+    try { localStorage.setItem(REVEAL_COOLDOWN_KEY, String(ts)); } catch (e) {}
+  }
+  function revealCooldownRemainingMs() {
+    var elapsed = Date.now() - _readReveal();
+    return Math.max(0, REVEAL_COOLDOWN_MS - elapsed);
+  }
+  function _formatCooldown(ms) {
+    var min = Math.ceil(ms / 60000);
+    if (min >= 60) return Math.ceil(min / 60) + 'h';
+    return min + ' min';
+  }
+  // Show a transient toast — re-uses the easter egg toast styling.
+  function _toast(message) {
+    var t = document.createElement('div');
+    t.className = 'gz-easter-toast';
+    t.textContent = message;
+    document.body.appendChild(t);
+    requestAnimationFrame(function() { t.style.opacity = '1'; });
+    setTimeout(function() {
+      t.style.opacity = '0';
+      setTimeout(function() { t.remove(); }, 400);
+    }, 2800);
+  }
+
+  // Track which clue indices have been revealed for a given turn's
+  // crossword. Stored as JSON array under `gazette-revealed-T<turn>`.
+  // Re-revealing a word that's already in this set is free (no
+  // cooldown) — players can reset the visual state and re-reveal what
+  // they already paid for, just not peek at NEW clues without waiting.
+  function _revealedKey(turn) { return 'gazette-revealed-T' + turn; }
+  function _readRevealed(turn) {
+    if (turn == null) return {};
+    try {
+      var raw = localStorage.getItem(_revealedKey(turn));
+      if (!raw) return {};
+      var arr = JSON.parse(raw);
+      var set = {};
+      (Array.isArray(arr) ? arr : []).forEach(function(i) { set[String(i)] = true; });
+      return set;
+    } catch (e) { return {}; }
+  }
+  function _addRevealed(turn, idx) {
+    if (turn == null) return;
+    try {
+      var set = _readRevealed(turn);
+      set[String(idx)] = true;
+      localStorage.setItem(_revealedKey(turn), JSON.stringify(Object.keys(set)));
+    } catch (e) {}
+  }
+
+  // Idempotent: re-running on the same pid replaces any prior handlers
+  // because we attach to elements freshly queried each time.
+  function wireCrosswordControls(pid, turn) {
+    var wrap = document.querySelector('.gz-xword-wrap[data-puzzle="' + pid + '"]');
+    if (!wrap) return;
+    function revealWord(idx) {
+      var clue = wrap.querySelector('.gz-xword-clue[data-word="' + idx + '"]');
+      if (clue) clue.classList.add('is-revealed');
+      // Find cells containing this word index in their data-words list
+      wrap.querySelectorAll('.gz-xword-cell').forEach(function(cell) {
+        var words = (cell.dataset.words || '').split(',');
+        if (words.indexOf(String(idx)) !== -1) cell.classList.add('is-revealed');
+      });
+    }
+    function reset() {
+      // Reset clears the visual state only — the localStorage record
+      // of which words have been revealed stays, so the player can
+      // re-reveal them without burning another cooldown window.
+      wrap.querySelectorAll('.is-revealed').forEach(function(el) { el.classList.remove('is-revealed'); });
+    }
+    // Reveal action wrapper. Two-tier check:
+    //   1. Already revealed for this turn? → free, no cooldown change.
+    //   2. New reveal? → enforce 1-hr cooldown across the whole page.
+    function tryReveal(idx) {
+      var revealed = _readRevealed(turn);
+      if (revealed[String(idx)]) {
+        // Re-reveal: already paid for. Just show.
+        revealWord(idx);
+        return;
+      }
+      var remaining = revealCooldownRemainingMs();
+      if (remaining > 0) {
+        _toast('Next reveal available in ' + _formatCooldown(remaining));
+        return;
+      }
+      revealWord(idx);
+      _addRevealed(turn, idx);
+      _writeReveal(Date.now());
+    }
+    // Restore any words already revealed in a previous session for this
+    // turn — so navigating away and back doesn't lose progress.
+    var preRevealed = _readRevealed(turn);
+    Object.keys(preRevealed).forEach(function(idx) { revealWord(idx); });
+
+    // Per-clue reveal buttons
+    wrap.querySelectorAll('.gz-xword-reveal').forEach(function(btn) {
+      btn.addEventListener('click', function(ev) {
+        ev.preventDefault();
+        tryReveal(btn.dataset.word);
+      });
+    });
+    var resetBtn = wrap.querySelector('.gz-xword-reset');
+    if (resetBtn) resetBtn.addEventListener('click', reset);
+  }
+
+  // Toast for easter-egg payoffs.
+  function showGazetteToast(msg) {
+    var t = document.createElement('div');
+    t.className = 'gz-easter-toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(function() { t.classList.add('show'); });
+    setTimeout(function() {
+      t.classList.remove('show');
+      setTimeout(function() { t.remove(); }, 400);
+    }, 3200);
+  }
+
+  // Konami code — listen once at the document level. Toggles
+  // the "tabloid" reskin on the gazette root.
+  (function() {
+    var seq = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown',
+               'ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    var pos = 0;
+    document.addEventListener('keydown', function(ev) {
+      var key = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+      if (key === seq[pos]) {
+        pos++;
+        if (pos === seq.length) {
+          pos = 0;
+          var root = document.getElementById('gazette-print-root');
+          if (root) {
+            root.classList.toggle('gz-tabloid');
+            showGazetteToast(root.classList.contains('gz-tabloid')
+              ? 'The Civ Tabloid: All the civilization that\'s NOT fit to print.'
+              : 'Sanity restored.');
+          }
+        }
+      } else {
+        pos = (key === seq[0]) ? 1 : 0;
+      }
+    });
+  })();
 
   function exportGazettePdf(g) {
     var btn = document.getElementById('gz-pdf');
@@ -960,9 +2250,22 @@
     document.title = 'Freeciv Longturn \u2014 ' + h;
   }
 
+  // Tracks whether we've already done the first render so we only force
+  // the page to scroll to top once. Subsequent re-renders (turn-change
+  // refetch, prev/next gazette navigation) preserve the user's scroll.
+  var _renderedOnce = false;
   function render(d) {
     DATA = d;
     renderNav(d); renderHero(d); renderGazette(d); renderRankings(d); renderHistory(d); renderFooter(d); renderConfig(d);
+    if (!_renderedOnce) {
+      _renderedOnce = true;
+      // The gazette is rendered async after fetch — without this, the
+      // browser's scroll-anchoring "stabilises" the user's view on
+      // whatever was visible BEFORE the gazette grew (typically the
+      // Rankings section), leaving them mysteriously scrolled-down.
+      // Force scroll to top after first paint.
+      requestAnimationFrame(function() { window.scrollTo(0, 0); });
+    }
   }
 
   function load() {

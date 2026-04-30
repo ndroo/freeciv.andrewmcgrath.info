@@ -134,8 +134,15 @@ fi
 # Get last 2 gazette headlines for context
 GAZETTE_CONTEXT=""
 if [ -f "$GAZETTE_FILE" ]; then
+  # Pull a teaser of the last 2 issues. Handles v1 (sections.front_page)
+  # and v2 (pages[].sections[] with kind=="lead") by checking whichever
+  # is present — keeps the editor responsive across schema versions.
   GAZETTE_CONTEXT=$(jq -r '
-    [.[-2:][] | "Turn \(.turn) (\(.year_display)): \(.headline)\nFront page: \(.sections.front_page.content // "" | gsub("<[^>]*>"; "") | .[0:300])"] | join("\n\n")
+    def front:
+      if .sections then (.sections.front_page.content // .sections.front_page // "")
+      elif .pages then ([.pages[].sections[] | select(.kind == "lead")] | .[0].content // "")
+      else "" end;
+    [.[-2:][] | "Turn \(.turn) (\(.year_display)): \(.headline)\nFront page: \(front | gsub("<[^>]*>"; "") | .[0:300])"] | join("\n\n")
   ' "$GAZETTE_FILE" 2>/dev/null || true)
 fi
 

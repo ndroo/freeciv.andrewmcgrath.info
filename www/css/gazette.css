@@ -1,0 +1,705 @@
+/* The Civ Chronicle — newspaper styles
+ *
+ * Three render paths share most of these styles:
+ *   v0  — single prose blob (turns 2-10)
+ *   v1  — single-page structured (turns 11-52, .gazette-front + .gazette-cols etc)
+ *   v2  — multi-page broadsheet  (turns 53+, .gazette-page + .gz-section-* + page-flip book)
+ *
+ * Sections on v2 are layout-self-contained so the AI can pick any
+ * section-kind sequence per page without breaking layout. Pages stack
+ * vertically below 700px (page-flip is disabled).
+ */
+
+/* ===== shared shell ===== */
+.gazette { background:#f5f0e6; border:none; border-radius:0; padding:0; color:#1a1a1a; font-family:'Georgia','Times New Roman',serif; }
+.gazette-masthead { text-align:center; padding:24px 32px 0; border-bottom:4px double #1a1a1a; }
+.gazette-masthead-name { font-size:42px; font-weight:900; color:#1a1a1a; letter-spacing:2px; font-family:'Georgia',serif; line-height:1; }
+.gazette-masthead-sub { font-size:11px; color:#666; text-transform:uppercase; letter-spacing:4px; margin-top:6px; }
+.gazette-masthead-rule { border:none; border-top:1px solid #1a1a1a; margin:12px 0 0; }
+/* Meta strip lives INSIDE the masthead but visually breaks out to the
+ * page edges via negative margins, matching .gazette-runninghead's full
+ * page-width footprint on pages 2+. Without this it sat inside the
+ * masthead's 32px horizontal padding and looked narrower than the
+ * running head on every other page. */
+.gazette-masthead-meta {
+  display:flex; justify-content:space-between;
+  font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px;
+  margin:12px -32px 0;
+  padding:6px 22px;
+  border-top:1px solid #ccc;
+}
+.gazette-headline { font-size:26px; font-weight:900; color:#1a1a1a; line-height:1.2; margin:0; letter-spacing:-0.5px; font-family:'Georgia',serif; text-align:center; padding:20px 32px 6px; }
+.gazette-headline-byline { font-size:11px; color:#666; text-align:center; font-style:italic; padding:0 32px 14px; border-bottom:1px solid #ccc; margin-bottom:0; }
+.gazette-body p { margin-bottom:8px; font-size:12.5px; line-height:1.6; color:#2a2a2a; text-align:justify; }
+.gazette-body p:last-child { margin-bottom:0; }
+.gazette-body strong { color:#1a1a1a; }
+.gazette-body em { font-style:italic; }
+.gazette-img-caption { font-size:9px; color:#666; text-align:center; line-height:1.4; margin-top:6px; border-top:1px solid #ccc; padding-top:5px; }
+.gazette-img-desc { font-style:italic; }
+.gazette-img-credit { display:block; margin-top:3px; font-style:normal; font-weight:600; color:#888; }
+.gazette-footer { text-align:center; padding:10px; border-top:4px double #1a1a1a; font-size:9px; color:#888; text-transform:uppercase; letter-spacing:2px; }
+
+/* ===== v0 — bare prose entries (turns 2-10) ===== */
+.gazette-v0-article { padding:18px 32px; }
+.gazette-v0-article p { margin-bottom:10px; font-size:13px; line-height:1.7; color:#2a2a2a; text-align:justify; }
+@media(max-width:600px) { .gazette-v0-article { padding:14px 18px; } }
+
+/* ===== v1 — single-page structured (turns 11-52) ===== */
+.gazette-front { display:grid; grid-template-columns:1fr 280px; gap:0; border-bottom:1px solid #ccc; }
+.gazette-front-text { padding:16px 20px; border-right:1px solid #ccc; }
+.gazette-front-aside { padding:16px 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.gazette-front-aside img { width:100%; border:1px solid #999; }
+@media(max-width:700px) { .gazette-front { grid-template-columns:1fr; } .gazette-front-text { border-right:none; border-bottom:1px solid #ccc; } }
+.gazette-cols { display:grid; grid-template-columns:1fr 1fr; gap:0; padding:0; }
+.gazette-col { padding:14px 20px; border-right:1px solid #ccc; }
+.gazette-col:last-child { border-right:none; }
+.gazette-col-title { font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#1a1a1a; border-bottom:2px solid #1a1a1a; padding-bottom:4px; margin-bottom:4px; }
+.gazette-col-byline { font-size:10px; color:#888; font-style:italic; margin-bottom:8px; }
+.gazette-opinion { padding:16px 20px; border-top:2px solid #1a1a1a; background:#ede8d8; }
+.gazette-opinion-label { font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#1a1a1a; border-bottom:1px solid #1a1a1a; padding-bottom:4px; margin-bottom:10px; }
+.gazette-opinion-col-title { font-size:16px; font-weight:800; color:#1a1a1a; line-height:1.3; margin-bottom:2px; font-family:'Georgia',serif; }
+.gazette-opinion-author { font-size:12px; font-weight:700; color:#1a1a1a; }
+.gazette-opinion-title-line { font-size:10px; color:#888; font-style:italic; margin-bottom:10px; }
+.gazette-letters { padding:16px 20px; border-top:1px solid #ccc; }
+.gazette-letters-title { font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#1a1a1a; border-bottom:1px solid #1a1a1a; padding-bottom:4px; margin-bottom:12px; }
+.gazette-letter { margin-bottom:12px; }
+.gazette-letter p { font-size:12px; line-height:1.6; color:#2a2a2a; margin:0; font-style:italic; }
+.gazette-letter-author { font-size:10px; color:#666; font-weight:600; margin-top:2px; text-align:right; }
+.gazette-standings { padding:16px 20px; border-top:2px solid #1a1a1a; }
+.gazette-standings-title { font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#1a1a1a; border-bottom:1px solid #1a1a1a; padding-bottom:4px; margin-bottom:10px; }
+.gazette-standings table { width:100%; border-collapse:collapse; font-size:11px; }
+.gazette-standings th { text-align:left; font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#888; padding:4px 6px; border-bottom:1px solid #ccc; }
+.gazette-standings td { padding:3px 6px; color:#2a2a2a; border-bottom:1px solid #e5e0d5; }
+.gazette-standings tr:last-child td { border-bottom:none; }
+.gazette-standings .rank { font-weight:700; color:#1a1a1a; }
+.gazette-corrections { padding:12px 20px; border-top:1px solid #ccc; background:#f0ebe0; }
+.gazette-corrections-title { font-size:10px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#8b0000; margin-bottom:6px; }
+.gazette-corrections p { font-size:12px; line-height:1.6; color:#2a2a2a; margin:0; font-style:italic; }
+.gazette-ads { padding:14px 20px; border-top:1px solid #ccc; }
+.gazette-ads-title { font-size:9px; text-transform:uppercase; letter-spacing:2px; font-weight:700; color:#888; margin-bottom:10px; text-align:center; border-bottom:1px solid #ccc; padding-bottom:6px; }
+.gazette-ads-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+@media(max-width:700px) { .gazette-ads-grid { grid-template-columns:1fr 1fr; } }
+@media(max-width:450px) { .gazette-ads-grid { grid-template-columns:1fr; } }
+.gazette-ad { font-size:9.5px; line-height:1.4; color:#333; text-align:left; padding:6px 8px; border-bottom:1px solid #d5d0c5; }
+.gazette-inprint { padding:60px 32px; text-align:center; background:#f5f0e6; }
+.gazette-inprint-label { font-size:10px; text-transform:uppercase; letter-spacing:4px; color:#8b0000; margin-bottom:14px; font-weight:700; }
+.gazette-inprint-headline { font-size:28px; font-weight:900; color:#1a1a1a; line-height:1.3; font-family:'Georgia',serif; margin-bottom:12px; }
+.gazette-inprint-sub { font-size:13px; color:#666; font-style:italic; max-width:440px; margin:0 auto; line-height:1.6; }
+.gazette-inprint-spinner { display:inline-block; width:10px; height:10px; background:#8b0000; border-radius:50%; margin:18px 0 0; animation:pulse 1.4s infinite; }
+@media(max-width:600px) { .gazette-cols { grid-template-columns:1fr; } .gazette-col { border-right:none; border-bottom:1px solid #ccc; } .gazette-masthead-name { font-size:28px; } .gazette-headline { font-size:20px; padding:16px 16px 6px; } .gazette-headline-byline { padding:0 16px 12px; } .gazette-col { padding:12px 16px; } .gazette-opinion { padding:12px 16px; } .gazette-letters { padding:12px 16px; } .gazette-standings { padding:12px 16px; } .gazette { padding:0; } }
+
+/* ===== v2 — multi-page broadsheet (turns 53+) =====
+ * Page-flip mode (desktop, ≥700px): pages are absolute-positioned and
+ * stacked; only one is "current" at a time. Switching pages rotates the
+ * outgoing page out on its Y axis like a turning leaf, while the next
+ * one settles in.
+ *
+ * Stacked mode (mobile, <700px): pages flow vertically with a visible
+ * "Continued on Page N" jump link.
+ */
+.gazette-book {
+  background:#f5f0e6;
+  padding:0;
+  position:relative;
+  perspective:2000px;
+  /* Establish a stacking context — the absolute-positioned pages inside
+   * shouldn't bleed over content that comes after the gazette section
+   * (like the Rankings chart). */
+  z-index:0;
+  isolation:isolate;
+  /* In is-flippable mode JS sets the book's height to the tallest
+   * paginated page so all pages fit without clipping AND no page
+   * differences cause layout shift between flips. */
+}
+
+/* v2 page layout: real broadsheet — sections arranged in a 2-column
+ * grid with `grid-auto-flow: dense` so the browser packs them into
+ * available cells (left + right boxes filling top-to-bottom).
+ *
+ * Spanning sections (masthead, lead, breaking, puzzle, letters, ads)
+ * take the full width via `grid-column: 1 / -1`. Everything else lives
+ * in a single column.
+ *
+ * This gives the classic newspaper feel: hero at top, 2x2 boxes
+ * underneath, recurring features stretched across the bottom.
+ */
+/* Magazine-style column flow: the page is two balanced columns of
+ * content. Sections are column items that flow naturally — no row-
+ * height syncing, so no ragged-bottom gaps. Span-all sections break
+ * the column flow with `column-span: all` (lead, breaking, puzzle,
+ * letters, ads, corrections, long-form prose articles, etc.). */
+.gazette-book .gazette-page {
+  columns:2;
+  column-gap:24px;
+  column-fill:balance;
+}
+/* Sections shouldn't break across columns — keep each one intact. */
+.gazette-book .gazette-page > .gz-section {
+  break-inside:avoid;
+  /* A small bottom margin separates stacked sections in the same column.
+   * Adjacent column-span:all sections handle their own spacing via the
+   * page's column-rule below. */
+  margin-bottom:14px;
+}
+/* Span-all anchors — these break the column flow and run full width.
+ * The list is liberal: any section that has substantial structure
+ * (table, grid, body columns) reads better as a full-width article
+ * than crammed into one column. The handful of true "sidebar" kinds
+ * (lottery, marketplace, looking_back, rumour_mill, etiquette) are
+ * the only ones that stay column-scoped. */
+.gazette-page > .gazette-masthead,
+.gazette-page > .gz-kind-lead,
+.gazette-page > .gz-kind-column,
+.gazette-page > .gz-kind-feature,
+.gazette-page > .gz-kind-dispatch,
+.gazette-page > .gz-kind-society,
+.gazette-page > .gz-kind-opinion,
+.gazette-page > .gz-kind-interview,
+.gazette-page > .gz-standalone-img,
+.gazette-page > .gz-kind-puzzle,
+.gazette-page > .gz-kind-letters,
+.gazette-page > .gz-kind-ads,
+.gazette-page > .gz-kind-breaking,
+.gazette-page > .gz-kind-obituary,
+.gazette-page > .gz-kind-corrections,
+.gazette-page > .gz-kind-weather,
+.gazette-page > .gz-kind-augury,
+.gazette-page > .gz-kind-sports,
+.gazette-page > .gz-kind-serial_fiction {
+  column-span:all;
+  -webkit-column-span:all;
+}
+/* No section-level borders. Each section's title carries a heavy
+ * underline (`.gz-section-title { border-bottom: 2px solid #1a1a1a }`)
+ * which doubles as the row's top rule, and section padding handles
+ * vertical separation. Trailing borders that ended in midair (when a
+ * column had nothing below the last section) looked unfinished.
+ * Spanning sections like `breaking` carry their own coloured borders. */
+
+/* Section images: scale to column width WITHOUT cropping. Aspect ratio
+ * preserved; overall section height varies but never lops the image.
+ * No border — the image carries its own frame from the AI illustration
+ * and an extra outline reads as web-y, not newsprint. */
+.gz-section:not(.gz-kind-lead) .gz-lead-img { margin:0 0 10px; }
+.gz-section:not(.gz-kind-lead) .gz-lead-img img {
+  width:100%; height:auto;
+  max-height:260px;
+  object-fit:contain;
+  display:block;
+  background:transparent;
+}
+/* Captions get a min-height so adjacent column sections align titles
+ * to the same Y. Captions naturally vary 1–3 lines; clamp to ~3 lines
+ * worth so a long caption doesn't push everything down vs a short one. */
+.gz-section .gazette-img-caption {
+  min-height:42px;          /* ~3 lines of 9px caption text */
+  display:flex; flex-direction:column; justify-content:flex-start;
+}
+.gz-kind-lead .gz-lead-img img { border:none; }   /* lead too — no border */
+
+@media(max-width:700px) {
+  /* Mobile: collapse to a single column flow so narrow text doesn't
+   * become unreadably tight. */
+  .gazette-book .gazette-page { columns:1; }
+}
+.gazette-page {
+  background:#f5f0e6;
+  padding:0;
+  position:relative;
+  box-shadow:0 -1px 0 rgba(26,26,26,0.08);
+}
+/* Page-flip retired: gazette renders as one continuous broadsheet. Old
+ * .gazette-book.is-flippable rules (absolute positioning, rotateY
+ * transitions, height-locking) and .gazette-flipctl button bar are gone.
+ * .gazette-runninghead and .gazette-page-jump are no longer emitted by
+ * the renderer for v2 editions, so their styles are dropped too.
+ * v0/v1 paths handle their own typography. */
+
+/* sections — each block holds its own typography but flows visually
+ * into the next one. Tight padding so adjacent sections butt up against
+ * each other (no boxy gaps); section titles' 2px black underline is the
+ * only divider between rows. */
+.gz-section { padding:8px 20px 14px; }
+.gz-section-title {
+  font-size:11px; text-transform:uppercase; letter-spacing:3px; font-weight:700;
+  color:#1a1a1a; border-bottom:2px solid #1a1a1a; padding-bottom:3px;
+  margin:0 0 6px; font-family:'Georgia', serif;
+  /* Plain block layout. We previously had `display:flex;
+   * align-items:flex-end; min-height:34px` here to bottom-align column
+   * underlines, but flex on a heading element with text content
+   * fragments the text on multi-line wraps (words appear in wrong
+   * order, whitespace collapsed). Cross-column underline alignment is
+   * less important than headlines that read correctly. */
+}
+.gz-section-byline { font-size:10px; color:#888; font-style:italic; margin-bottom:8px; }
+
+/* Body text — the workhorse style. Tight, justified, real-newspaper density. */
+.gz-body { font-size:12.5px; line-height:1.55; color:#2a2a2a; }
+.gz-body p { margin:0 0 9px; text-align:justify; hyphens:auto; }
+.gz-body p:last-child { margin-bottom:0; }
+.gz-body strong { color:#1a1a1a; }
+.gz-body em { font-style:italic; }
+
+/* lead — the splash story at the top of a page */
+.gz-kind-lead {
+  padding:18px 26px 20px;
+  background:transparent;
+}
+.gz-kind-lead .gz-section-title {
+  font-size:32px; font-weight:900; line-height:1.05; letter-spacing:-0.8px;
+  text-transform:none; border-bottom:none; padding-bottom:0;
+  text-align:center; margin:6px 0 4px;
+  font-family:'Georgia', 'Times New Roman', serif;
+}
+.gz-kind-lead .gz-section-byline {
+  text-align:center; margin-bottom:12px;
+  font-size:10px; letter-spacing:2px; text-transform:uppercase;
+  color:#666; font-style:normal;
+}
+/* Lead hero image: cap width so it doesn't dominate. Centered with a
+ * caption underneath. AI's "fullbleed" feel can still be done via the
+ * standalone `kind: image` with `size: full`. */
+.gz-kind-lead .gz-lead-img {
+  margin:0 auto 14px;
+  max-width:60%;
+}
+.gz-kind-lead .gz-lead-img img { width:100%; height:auto; border:none; }
+@media(max-width:600px) {
+  .gz-kind-lead .gz-lead-img { max-width:100%; }
+}
+/* Multi-column body for the lead — real broadsheet feel.
+ * The hero image (lead_image_id) renders ABOVE the columns since it's
+ * a sibling of .gz-body, so columns wrap cleanly below it. */
+.gz-kind-lead .gz-body {
+  column-count:2;
+  column-gap:24px;
+  column-rule:1px solid #ddd;
+  font-size:13px;
+}
+.gz-kind-lead .gz-body p { text-align:justify; }
+/* Drop cap on the first paragraph of the lead */
+.gz-kind-lead .gz-body > p:first-child::first-letter {
+  font-size:46px; float:left; line-height:0.88;
+  margin:6px 7px 0 0; font-weight:900; color:#1a1a1a;
+  font-family:'Georgia', serif;
+}
+
+/* column / feature / dispatch / society — multi-column body for density */
+.gz-kind-column,
+.gz-kind-feature,
+.gz-kind-dispatch,
+.gz-kind-society {
+  /* a touch more breathing room */
+}
+.gz-kind-column .gz-body,
+.gz-kind-feature .gz-body,
+.gz-kind-society .gz-body,
+.gz-kind-dispatch .gz-body {
+  column-count:2;
+  column-gap:22px;
+  column-rule:1px solid #ddd;
+}
+.gz-kind-rumour_mill .gz-body,
+.gz-kind-etiquette .gz-body { /* leave single-column for short blocks */ }
+
+/* Single column on small viewports — multi-column reads badly under 600px */
+@media(max-width:600px) {
+  .gz-kind-lead .gz-body,
+  .gz-kind-column .gz-body,
+  .gz-kind-feature .gz-body,
+  .gz-kind-society .gz-body,
+  .gz-kind-dispatch .gz-body {
+    column-count:1;
+  }
+}
+
+/* opinion — distinct "op-ed" block. Uses darker background + italic
+ * body to mark it apart from neighbouring columns. No top border —
+ * a 2px black line at the top creates an asymmetric edge against the
+ * adjacent column section that has no such border. */
+/* Opinion: italic body + distinctive title underline carry the "op-ed"
+ * feel. Background tint dropped — it was making the section look like a
+ * separate tile in a gallery rather than part of one continuous paper. */
+.gz-kind-opinion { padding:8px 20px 14px; }
+.gz-kind-opinion .gz-section-title { color:#1a1a1a; }
+.gz-kind-opinion .gazette-opinion-col-title {
+  font-size:18px; font-weight:800; color:#1a1a1a; line-height:1.3;
+  margin:6px 0 4px; font-family:'Georgia', serif; font-style:italic;
+}
+.gz-kind-opinion .gz-opinion-author {
+  font-size:13px; font-weight:700; color:#1a1a1a; margin-bottom:2px;
+  display:inline-block;
+}
+.gz-kind-opinion .gz-opinion-author-title {
+  font-size:10px; color:#666; font-style:italic; margin-bottom:14px;
+  display:inline-block; margin-left:6px;
+}
+.gz-kind-opinion .gz-opinion-author + .gz-opinion-author-title::before { content:" — "; color:#999; margin-right:4px; }
+.gz-kind-opinion .gz-body { column-count:2; column-gap:22px; column-rule:1px solid #d0c8b0; }
+.gz-kind-opinion .gz-body > p:first-child::first-letter {
+  font-size:42px; float:left; line-height:0.88;
+  margin:5px 6px 0 0; font-weight:900; color:#1a1a1a;
+  font-family:'Georgia', serif;
+}
+@media(max-width:600px) { .gz-kind-opinion .gz-body { column-count:1; } }
+
+/* interview — Q&A with styled questions and pull-quote on the first answer */
+.gz-kind-interview { padding:8px 20px 14px; }
+.gz-kind-interview .gz-interview-subject {
+  font-size:15px; font-weight:700; color:#1a1a1a;
+  margin:4px 0 2px; font-style:normal;
+}
+.gz-kind-interview .gz-body p { font-size:13px; line-height:1.6; margin:0 0 10px; }
+/* Style Q: prefix in italic content as bold sans-serif label */
+.gz-kind-interview .gz-body p em:first-child {
+  display:block; font-style:normal; font-weight:700; font-size:11px;
+  letter-spacing:1.5px; text-transform:uppercase; color:#5b3a00;
+  margin-bottom:2px;
+}
+
+/* breaking — high-priority red-bordered box. Symmetric border on all
+ * four sides (no offset drop-shadow — that made the right + bottom
+ * edges look heavier than left + top). Larger type than column
+ * sections so it reads as the "stop the presses" feature it is. */
+.gz-kind-breaking {
+  background:#fdf6e3; border:2px solid #8b0000;
+  padding:18px 22px; margin:14px 18px;
+  box-shadow:0 0 0 1px #fff inset;
+}
+.gz-kind-breaking .gz-section-title {
+  color:#8b0000; border-bottom-color:#8b0000;
+  font-size:15px; letter-spacing:4px; padding-bottom:5px; margin-bottom:10px;
+}
+.gz-kind-breaking .gz-body p { font-size:14px; line-height:1.65; }
+
+/* obituary — solemn black border */
+.gz-kind-obituary { padding:14px 22px; text-align:center; }
+.gz-kind-obituary .gz-section-title { font-size:18px; font-weight:900; text-transform:uppercase; letter-spacing:3px; border-bottom:none; }
+
+/* looking_back — sepia-toned retrospective with archive feel */
+.gz-kind-looking_back {
+  border-left:4px solid #5b3a00;
+  padding-left:18px;
+}
+.gz-kind-looking_back .gz-section-title {
+  color:#5b3a00; border-bottom-color:#5b3a00;
+  font-style:italic; letter-spacing:2px;
+}
+.gz-kind-looking_back .gz-body p { color:#3a2d12; font-style:italic; }
+
+/* letters */
+.gz-kind-letters .gz-letter { margin-bottom:14px; padding-left:14px; border-left:2px solid #ccc; }
+.gz-kind-letters .gz-letter-title { font-size:12px; font-weight:700; color:#1a1a1a; margin-bottom:2px; font-style:normal; }
+.gz-kind-letters .gz-letter p { font-size:12px; line-height:1.6; color:#2a2a2a; margin:0; font-style:italic; }
+.gz-kind-letters .gz-letter-author { font-size:10px; color:#666; font-weight:600; margin-top:4px; text-align:right; font-style:normal; }
+
+/* sports — era-styled athletic report */
+.gz-kind-sports { /* no background; titles + dotted result rules carry the look */ }
+.gz-kind-sports .gz-section-title { color:#3d5300; border-bottom-color:#3d5300; }
+.gz-kind-sports .gz-results { font-size:11px; line-height:1.7; color:#2a2a2a; }
+.gz-kind-sports .gz-result-row { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px dotted #ccc; }
+.gz-kind-sports .gz-result-row:last-child { border-bottom:none; }
+
+/* weather / augury — multi-day forecast plus hazard outlooks */
+.gz-kind-weather { /* no background tile — section flows into the rest */ }
+.gz-kind-weather .gz-section-title { color:#244972; border-bottom-color:#244972; }
+.gz-kind-weather .gz-weather-forecast { font-size:13px; line-height:1.6; color:#2a2a2a; font-style:italic; padding:6px 0 10px; }
+.gz-kind-weather .gz-weather-outlooks {
+  margin-top:10px;
+  padding-top:8px;
+  border-top:1px solid #b9c4d2;
+}
+.gz-kind-weather .gz-weather-outlooks-title {
+  font-size:9px; text-transform:uppercase; letter-spacing:2px;
+  color:#244972; font-weight:700; margin-bottom:8px;
+}
+/* Hazard outlook rows — each row is a flexbox with FIXED widths for
+ * badge and kind, so columns line up vertically across rows without
+ * any display:contents/grid-children gymnastics (which were
+ * unreliable in column-flow contexts). The note flexes to fill. */
+.gz-kind-weather .gz-weather-outlook {
+  display:flex; align-items:center; gap:14px;
+  padding:6px 0;
+  border-bottom:1px dotted #b9c4d2;
+}
+.gz-kind-weather .gz-weather-outlook:last-child { border-bottom:none; }
+.gz-kind-weather .gz-weather-outlook-level {
+  flex:0 0 80px;          /* fixed width — all badges in same column */
+  text-transform:uppercase; font-size:9px; letter-spacing:1px;
+  font-weight:800; padding:3px 0; border-radius:2px;
+  background:#c5cdd9; color:#1a1a1a;
+  text-align:center;
+}
+.gz-kind-weather .gz-weather-outlook-kind {
+  flex:0 0 200px;         /* fixed width — all kinds align in same column */
+  font-weight:800; letter-spacing:1.2px; color:#244972;
+  text-transform:uppercase; font-size:11.5px;
+}
+.gz-kind-weather .gz-weather-outlook-note {
+  flex:1 1 auto; min-width:0;
+  color:#2a2a2a; line-height:1.4; font-size:11.5px;
+}
+@media(max-width:600px) {
+  /* Stack on mobile — fixed-width columns don't fit. */
+  .gz-kind-weather .gz-weather-outlook { flex-wrap:wrap; }
+  .gz-kind-weather .gz-weather-outlook-kind,
+  .gz-kind-weather .gz-weather-outlook-note { flex-basis:100%; }
+}
+.gz-kind-weather .gz-weather-level-low .gz-weather-outlook-level { background:#c8d8b8; color:#2a3d1a; }
+.gz-kind-weather .gz-weather-level-moderate .gz-weather-outlook-level { background:#e8d8a8; color:#5b3a00; }
+.gz-kind-weather .gz-weather-level-watch .gz-weather-outlook-level { background:#e8c8a8; color:#5b3a00; }
+.gz-kind-weather .gz-weather-level-severe .gz-weather-outlook-level { background:#c88080; color:#3a0000; }
+
+/* World weather — per-nation cards in a responsive grid. The big icon
+ * gives the section a cartoony, glanceable feel; the nation/capital/
+ * terrain anchors it to the actual game state. */
+.gz-kind-weather .gz-weather-regions {
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid #b9c4d2;
+}
+.gz-kind-weather .gz-weather-regions-title {
+  font-size:9px; text-transform:uppercase; letter-spacing:2px;
+  color:#244972; font-weight:700; margin-bottom:8px;
+}
+.gz-kind-weather .gz-weather-region-grid {
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:6px 10px;
+}
+/* When the weather is full-width (gz-weather-rich), pack 3 across to give
+ * each card more breathing room than the cramped 4-across original. */
+.gazette-page > .gz-weather-rich .gz-weather-region-grid {
+  grid-template-columns:repeat(3, 1fr);
+}
+.gz-kind-weather .gz-weather-region {
+  display:flex; gap:8px; align-items:flex-start;
+  padding:6px 8px;
+  background:rgba(255,255,255,0.55);
+  border:1px solid #c5cdd9;
+}
+.gz-kind-weather .gz-weather-region-icon {
+  font-size:22px; line-height:1; flex:0 0 auto;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,0.08));
+}
+.gz-kind-weather .gz-weather-region-body { flex:1; min-width:0; }
+.gz-kind-weather .gz-weather-region-place {
+  font-size:10px; line-height:1.25;
+  margin-bottom:2px;
+}
+.gz-kind-weather .gz-weather-region-nation {
+  font-weight:800; color:#244972; letter-spacing:0.3px;
+}
+.gz-kind-weather .gz-weather-region-capital {
+  color:#1a1a1a;
+}
+.gz-kind-weather .gz-weather-region-terrain {
+  color:#888; font-style:italic; font-size:9.5px;
+}
+.gz-kind-weather .gz-weather-region-forecast {
+  font-size:10.5px; line-height:1.35; color:#2a2a2a;
+  font-style:italic;
+}
+.gz-kind-weather .gz-weather-region-omen {
+  margin-top:2px; font-size:9.5px; color:#5b3a00; font-weight:600;
+  line-height:1.3;
+}
+@media(max-width:600px) {
+  .gz-kind-weather .gz-weather-region-grid,
+  .gazette-page > .gz-weather-rich .gz-weather-region-grid {
+    grid-template-columns:1fr;
+  }
+}
+
+/* lottery — auspicious numbers, big numerals */
+.gz-kind-lottery { text-align:center; }
+.gz-kind-lottery .gz-section-title { color:#8b0000; border-bottom-color:#8b0000; }
+.gz-kind-lottery .gz-lottery-numbers { display:flex; justify-content:center; gap:10px; padding:8px 0; }
+.gz-kind-lottery .gz-lottery-number { display:inline-block; width:32px; height:32px; line-height:32px; border-radius:50%; background:#1a1a1a; color:#f5f0e6; font-weight:900; font-size:14px; }
+.gz-kind-lottery .gz-lottery-label { font-size:10px; color:#666; font-style:italic; margin-top:4px; }
+
+/* puzzle — crossword/word search/cipher */
+.gz-kind-puzzle { /* no background — crossword grid + clues carry their own visual weight */ }
+.gz-kind-puzzle .gz-section-title { color:#5b3a00; border-bottom-color:#5b3a00; }
+.gz-kind-puzzle .gz-puzzle-grid { font-family:'Courier New', monospace; white-space:pre; font-size:13px; line-height:1.3; padding:8px 0; text-align:center; color:#1a1a1a; letter-spacing:3px; }
+.gz-kind-puzzle .gz-puzzle-clues { font-size:11px; line-height:1.5; color:#2a2a2a; }
+.gz-kind-puzzle .gz-puzzle-clue { padding:2px 0; }
+.gz-kind-puzzle .gz-puzzle-clue strong { color:#1a1a1a; }
+.gz-kind-puzzle .gz-wordsearch-list { font-size:11px; color:#2a2a2a; padding:8px 0; text-align:center; line-height:1.7; }
+
+/* crossword — built client-side from {word, clue} entries.
+ * Uses CSS Grid with explicit `--cell` size variable so every cell is a
+ * pixel-perfect square (table-layout couldn't enforce this when the
+ * surrounding flex parent stretched). */
+.gz-xword-wrap { padding:10px 0; --cell:28px; }
+.gz-xword-board {
+  display:flex; gap:22px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+}
+.gz-xword {
+  display:grid; gap:0;
+  /* grid-template-columns/rows set inline by the renderer */
+  grid-auto-rows:var(--cell);
+  font-family:'Georgia', serif;
+  flex:0 0 auto;
+  /* explicit width so the table doesn't stretch under flex */
+  width:max-content;
+}
+.gz-xword > div {
+  width:var(--cell); height:var(--cell);
+  box-sizing:border-box;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+  font-size:14px; font-weight:700; color:#1a1a1a;
+  text-transform:uppercase; line-height:1;
+}
+.gz-xword-cell { background:#fff; border:1px solid #1a1a1a; }
+.gz-xword-black { background:#1a1a1a; border:1px solid #1a1a1a; }
+.gz-xword-num {
+  position:absolute; top:1px; left:2px;
+  font-size:8px; color:#5b3a00; line-height:1; font-weight:700;
+}
+.gz-xword-letter {
+  visibility:hidden;
+  font-weight:700;
+}
+.gz-xword-cell.is-revealed .gz-xword-letter { visibility:visible; color:#8b0000; }
+
+.gz-xword-clues {
+  display:flex; gap:22px; flex:1; min-width:240px;
+  font-size:11.5px; line-height:1.55; color:#2a2a2a;
+}
+.gz-xword-cluecol { flex:1; }
+.gz-xword-cluecol h4 {
+  font-size:10px; text-transform:uppercase; letter-spacing:2px;
+  color:#5b3a00; border-bottom:1px solid #5b3a00; padding-bottom:3px;
+  margin:0 0 6px; font-weight:700; font-family:Georgia, serif;
+}
+.gz-xword-clue { padding:3px 0; display:flex; align-items:baseline; gap:6px; }
+.gz-xword-clue strong { color:#1a1a1a; flex:0 0 auto; min-width:18px; }
+.gz-xword-clue .gz-xword-cluetext { flex:1; }
+.gz-xword-clue .gz-xword-reveal {
+  flex:0 0 auto;
+  font-size:9px; color:#888; text-decoration:underline; cursor:pointer;
+  font-style:italic; user-select:none;
+  background:none; border:none; padding:0; font-family:Georgia, serif;
+}
+.gz-xword-clue .gz-xword-reveal:hover { color:#8b0000; }
+.gz-xword-clue.is-revealed .gz-xword-reveal { color:#8b0000; }
+
+/* Reveal-all / reset — sit below the clues block, full-width, centered. */
+.gz-xword-controls {
+  display:flex; justify-content:center; gap:10px;
+  padding:14px 0 4px; margin-top:8px;
+  border-top:1px solid #d6c89a;
+  font-size:10px;
+}
+.gz-xword-controls button {
+  background:#f5f0e6; border:1px solid #5b3a00; color:#5b3a00;
+  padding:5px 14px; font-family:Georgia, serif; font-size:10px;
+  cursor:pointer; letter-spacing:2px; text-transform:uppercase;
+  font-weight:700;
+}
+.gz-xword-controls button:hover { background:#5b3a00; color:#f5f0e6; }
+
+@media(max-width:600px) {
+  .gz-xword-board { flex-direction:column; align-items:center; }
+  .gz-xword-clues { width:100%; }
+}
+
+/* marketplace */
+.gz-kind-marketplace .gz-market-row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dotted #ccc; font-size:11px; }
+.gz-kind-marketplace .gz-market-row:last-child { border-bottom:none; }
+
+/* corrections — red title */
+.gz-kind-corrections { /* no background — title underline + small italic body carries the look */ font-size:10.5px; }
+.gz-kind-corrections .gz-section-title { color:#8b0000; border-bottom-color:#8b0000; }
+.gz-kind-corrections .gz-body p { font-style:italic; }
+
+/* ads / classifieds — exactly 6, in a 3×2 grid */
+.gz-kind-ads .gz-ads-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:0;
+}
+.gz-kind-ads .gz-ad {
+  font-size:9.5px; line-height:1.45; color:#333;
+  padding:8px 12px;
+  border-right:1px dotted #b7ad8c;
+  border-bottom:1px dotted #b7ad8c;
+}
+.gz-kind-ads .gz-ad:nth-child(3n) { border-right:none; }
+.gz-kind-ads .gz-ad:nth-child(n+4) { border-bottom:none; }
+@media(max-width:700px) {
+  .gz-kind-ads .gz-ads-grid { grid-template-columns:1fr 1fr; }
+  .gz-kind-ads .gz-ad:nth-child(2n) { border-right:none; }
+  .gz-kind-ads .gz-ad:nth-child(2n+1) { border-right:1px dotted #b7ad8c; }
+  .gz-kind-ads .gz-ad:nth-child(n+5) { border-bottom:none; }
+}
+@media(max-width:500px) {
+  .gz-kind-ads .gz-ads-grid { grid-template-columns:1fr; }
+  .gz-kind-ads .gz-ad { border-right:none !important; border-bottom:1px dotted #b7ad8c !important; }
+  .gz-kind-ads .gz-ad:last-child { border-bottom:none !important; }
+}
+
+/* image blocks */
+.gz-lead-img { margin:0 0 14px; padding:0; }
+.gz-lead-img img { width:100%; height:auto; border:none; }
+.gz-inline-img { float:right; width:45%; margin:4px 0 8px 14px; padding:0; }
+.gz-inline-img img { width:100%; height:auto; border:none; }
+@media(max-width:600px) { .gz-inline-img { float:none; width:100%; margin:8px 0; } }
+.gz-standalone-img { padding:18px 20px; text-align:center; }
+.gz-standalone-img img { max-width:100%; height:auto; border:none; }
+.gz-standalone-img.gz-size-half img { max-width:60%; }
+.gz-standalone-img.gz-size-aside img { max-width:40%; }
+.gz-img-missing { padding:14px 18px; background:#ede8d8; border:1px dashed #999; font-size:11px; color:#666; font-style:italic; text-align:center; }
+
+/* edition label banner (rare) */
+.gz-edition-label { background:#1a1a1a; color:#f5f0e6; padding:6px 12px; font-size:10px; text-transform:uppercase; letter-spacing:4px; text-align:center; font-weight:700; }
+
+/* sponsorship gag (rare easter egg) */
+.gz-sponsor { font-size:10px; color:#666; font-style:italic; text-align:center; padding:6px; border-bottom:1px solid #ccc; }
+
+/* ===== easter eggs ===== */
+
+/* coffee stain overlay (1/20 editions) — pure CSS so no asset needed */
+.gz-coffee-stain { position:relative; }
+.gz-coffee-stain::after {
+  content:""; position:absolute; pointer-events:none; mix-blend-mode:multiply;
+  top:80px; right:24px; width:140px; height:140px; opacity:0.32;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 60% 40%, transparent 38%, rgba(101,67,33,0.55) 41%, rgba(101,67,33,0.25) 50%, transparent 58%),
+    radial-gradient(circle at 35% 55%, transparent 52%, rgba(80,53,26,0.35) 56%, transparent 62%);
+  filter:blur(0.5px);
+}
+
+/* hidden settler (every 5th edition) — small unicode glyph absolute-positioned
+ * in a corner of page 2. Gray tint so it blends into the paper. Click awards
+ * a toast (handled in JS). */
+.gz-hidden-settler {
+  position:absolute; cursor:pointer; z-index:5; user-select:none;
+  font-size:14px; line-height:1; color:#444; opacity:0.55;
+  text-shadow:0 0 1px #f5f0e6;
+}
+.gz-hidden-settler:hover { opacity:1; color:#8b0000; outline:1px dashed #8b0000; outline-offset:2px; }
+.gz-easter-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1a1a1a; color:#f5f0e6; padding:10px 18px; border-radius:4px; font-size:13px; z-index:1000; opacity:0; transition:opacity .3s; pointer-events:none; }
+.gz-easter-toast.show { opacity:1; }
+
+/* Konami "Civ Tabloid" reskin */
+.gz-tabloid .gazette-masthead-name,
+.gz-tabloid .gz-kind-lead .gz-section-title,
+.gz-tabloid .gazette-headline { font-family:'Impact', 'Arial Black', sans-serif !important; color:#cc0000 !important; letter-spacing:0 !important; text-transform:uppercase; transform:skewX(-3deg); }
+.gz-tabloid .gazette-masthead-name::after { content:"!!!"; }
+.gz-tabloid .gazette { background:#fff5cc; }
+.gz-tabloid .gz-kind-lead { background:#ffeb99; }
+
+/* mobile fallback for v2: stacked pages, jump link visible */
+@media(max-width:700px) {
+  .gazette-page-jump { display:block; }
+  .gz-kind-lead { padding:14px 16px 12px; }
+  .gz-kind-lead .gz-section-title { font-size:20px; }
+  .gz-section { padding:12px 16px; }
+  .gz-inline-img { float:none; width:100%; margin:8px 0; }
+}

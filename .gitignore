@@ -4,3 +4,4 @@ local-data/
 __pycache__/
 .pytest_cache/
 *.pyc
+.claude/

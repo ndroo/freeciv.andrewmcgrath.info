@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "turn": 99,
+  "year": -1300,
+  "year_display": "1300 BC",
+  "headline": "TEST EDITION",
+  "edition_label": null,
+  "images": [
+    { "id": "im1", "prompt": "A test scene", "caption": "Test caption", "credit": "Test artist" },
+    { "id": "im2", "prompt": "Second scene", "caption": "Another caption", "credit": "Another artist" }
+  ],
+  "pages": [
+    {
+      "page_number": 1,
+      "sections": [
+        { "kind": "lead", "title": "Headline test", "byline": "Test Reporter", "lead_image_id": "im1", "content": "<p>Lead body. {{img:im2}} More body.</p>" },
+        { "kind": "column", "title": "Economy", "byline": "Test", "content": "<p>Words.</p>" },
+        { "kind": "opinion", "author": "Plato", "author_title": "Philosopher", "title": "On testing", "content": "<p>Opine.</p>" }
+      ]
+    },
+    {
+      "page_number": 2,
+      "sections": [
+        { "kind": "letters", "items": [{"from": "Citizen", "title": "A complaint", "body": "Why?"}] },
+        { "kind": "puzzle", "type": "crossword", "title": "Test", "clues": [{"label": "1A.", "clue": "Clue"}] },
+        { "kind": "ads", "items": ["WANTED — One scribe."] }
+      ]
+    }
+  ]
+}

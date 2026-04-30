@@ -89,6 +89,8 @@ COPY www/editor.html /opt/freeciv/www/editor.html
 COPY www/admin.html /opt/freeciv/www/admin.html
 COPY www/dashboard.html /opt/freeciv/www/dashboard.html
 COPY www/login.html /opt/freeciv/www/login.html
+COPY www/css/ /opt/freeciv/www/css/
+COPY www/vendor/ /opt/freeciv/www/vendor/
 COPY respond_to_editor.sh /opt/freeciv/respond_to_editor.sh
 COPY generate_dashboard.sh /opt/freeciv/generate_dashboard.sh
 COPY python/lib /opt/freeciv/python/lib
