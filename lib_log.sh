@@ -24,7 +24,11 @@ plog() {
   ts=$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ 2>/dev/null)
   # BSD date (macOS) leaves "%3N" literal — fall back to seconds-only.
   case "$ts" in *3N*) ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) ;; esac
-  printf '%s [%s] %s\n' "$ts" "$1" "$2" >> "$TURN_PIPELINE_LOG" 2>/dev/null || true
+  # Wrap the redirect in a brace-group so a failed open (e.g. the parent
+  # dir doesn't exist in test environments) doesn't print a stderr
+  # warning. `>>` errors land on bash's stderr, not the command's, so the
+  # inner `2>/dev/null` alone wouldn't catch them.
+  { printf '%s [%s] %s\n' "$ts" "$1" "$2" >> "$TURN_PIPELINE_LOG"; } 2>/dev/null || true
 }
 
 # Log a BEGIN event and echo the start epoch (seconds) on stdout. Capture it

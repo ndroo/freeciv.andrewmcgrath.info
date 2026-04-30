@@ -64,6 +64,17 @@
   <p class="subtitle">Server updates, fixes, and new features.</p>
 
   <div class="entry">
+    <div class="entry-date">April 30, 2026</div>
+    <div class="entry-title">Status &amp; Dashboard Builders Rewritten in Python</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>No more 30-minute lock-stalls on turn change</strong> — the bash <code>build_diplomacy</code> and <code>build_attendance</code> functions iterated all save files and forked <code>jq</code> per relationship per turn, which on a 53-turn game took 30+ minutes and held the status-json lockfile the whole time. Cron runs every 5 min, so when the rebuild stalled, every subsequent run hit "Another instance is running, skipping" and <code>status.json</code> went stale for hours. The countdown timer would lock to 0:00 and the page reported a save_mtime from many hours back. Diplomacy and attendance rebuilds now happen in a python module (<code>python/lib/</code>) and finish in ~1.2s on the same input — a ~1500x speedup.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Per-player dashboards build in 1.6s instead of 9-24 minutes</strong> — same root cause (forks <code>jq</code> per player per turn). Ported to python with proper dict-diffs.</li>
+      <li><span class="tag tag-new">New</span> <strong>pytest test suite</strong> — 64 tests covering save parsing, diplomacy, attendance, history, status, and dashboard building, against 53 real save fixtures committed to <code>python/tests/fixtures/</code>. Runs in a Debian-bookworm Docker image so the dev environment matches prod (no mac-specific date/find surprises).</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Always full rebuild, never incremental</strong> — at &lt;2s per build it's not worth the bug surface of incremental state-replay logic. Self-healing: any corruption fixes itself on the next cron tick.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
     <div class="entry-date">April 29, 2026</div>
     <div class="entry-title">Chronicle Retries + Turn-Change Pipeline Logging</div>
     <ul>

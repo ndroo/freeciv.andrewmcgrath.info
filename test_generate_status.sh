@@ -390,10 +390,13 @@ assert_eq "history[3].turn == 4" "4" "$(hjqf '.[3].turn')"
 HIST_HAS_YEAR=$(hjqf '[.[] | has("year")] | all | tostring')
 assert_true "Each history entry has year" "$HIST_HAS_YEAR"
 
-# History players have expected fields
+# History players have expected fields. Both bash and python builders
+# emit the full set including score-section breakdowns (culture/pollution/
+# literacy/etc.) — older versions of this test only listed the top-level
+# fields, which was always incomplete.
 HIST_PLAYER_FIELDS=$(jq -c '
   [.[0].players | to_entries[0].value | keys[]] | sort' "$SAVE_DIR/history.json")
-EXPECTED_HIST_FIELDS='["cities","gold","government","is_alive","nation","score","techs","unit_types","units"]'
+EXPECTED_HIST_FIELDS='["cities","culture","gold","government","is_alive","landarea","literacy","nation","pollution","population","score","spaceship","techs","unit_types","units","units_built","units_killed","units_lost","wonders"]'
 assert_eq "History player objects have expected fields" \
   "$EXPECTED_HIST_FIELDS" "$HIST_PLAYER_FIELDS"
 
@@ -515,10 +518,13 @@ else
   fail "Failed to recover from corrupted history.json"
 fi
 
-# Should have 1 entry (just the current turn, since we lost history)
+# Recovery rebuilds the WHOLE history from the saves, not just the current
+# turn. The python rewrite is fast enough that always-full-rebuild is the
+# right choice — older bash incremental code lost history on corruption.
 RECOVERY_LEN=$(hjqf '. | length')
-assert_eq "Recovery: history has 1 entry (current turn only)" "1" "$RECOVERY_LEN"
-assert_eq "Recovery: entry is turn 4" "4" "$(hjqf '.[0].turn')"
+assert_eq "Recovery: history rebuilt from all 4 saves" "4" "$RECOVERY_LEN"
+RECOVERY_TURNS=$(hjqf '[.[].turn] | sort | tostring')
+assert_eq "Recovery: turns are [1,2,3,4]" "[1,2,3,4]" "$RECOVERY_TURNS"
 
 # =============================================================================
 # Test: gazette_publishing marker is surfaced in status.json

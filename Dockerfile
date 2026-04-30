@@ -57,6 +57,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     busybox-static \
     jq \
+    python3 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
@@ -90,6 +91,8 @@ COPY www/dashboard.html /opt/freeciv/www/dashboard.html
 COPY www/login.html /opt/freeciv/www/login.html
 COPY respond_to_editor.sh /opt/freeciv/respond_to_editor.sh
 COPY generate_dashboard.sh /opt/freeciv/generate_dashboard.sh
+COPY python/lib /opt/freeciv/python/lib
+COPY python/bin /opt/freeciv/python/bin
 COPY www/cgi-bin/ /opt/freeciv/www/cgi-bin/
 COPY crontab /etc/crontabs/freeciv
 RUN chmod +x /opt/freeciv/turn_notify.sh /opt/freeciv/turn_reminder.sh /opt/freeciv/start.sh /opt/freeciv/generate_status_json.sh /opt/freeciv/generate_gazette.sh /opt/freeciv/generate_nations.sh /opt/freeciv/respond_to_editor.sh /opt/freeciv/generate_dashboard.sh /opt/freeciv/www/cgi-bin/*

@@ -366,22 +366,12 @@ else
 fi
 
 if [ "$REBUILD_HISTORY" = "true" ]; then
-  # Rebuild from all save files
+  # Full rebuild via the python builder. The bash equivalent below was
+  # ~jq forks per save × 53 saves × 16 players = many minutes; python
+  # does the same work in ~1s.
   echo "[status-json] Rebuilding history from all save files..."
-  HISTORY_JSON="[]"
-  while read -r turn_num save_path; do
-    [ -z "$save_path" ] && continue
-    [ ! -f "$save_path" ] && continue
-    TMPFILE=$(decompress_save "$save_path") || continue
-    ENTRY=$(build_history_entry "$TMPFILE")
-    PUB_EVENTS=$(extract_public_events "$TMPFILE")
-    ENTRY=$(echo "$ENTRY" | jq --argjson ev "$PUB_EVENTS" '. + {public_events: $ev}')
-    HISTORY_JSON=$(echo "$HISTORY_JSON" | jq --argjson entry "$ENTRY" '. + [$entry]')
-    rm -f "$TMPFILE"
-  done <<< "$SAVE_FILES"
-  echo "$HISTORY_JSON" > "$HISTORY_FILE.tmp"
-  mv "$HISTORY_FILE.tmp" "$HISTORY_FILE"
-  echo "[status-json] Rebuilt history with $(echo "$HISTORY_JSON" | jq 'length') entries"
+  python3 "$SCRIPT_DIR/python/bin/build_history.py" --save-dir "$SAVE_DIR"
+  HISTORY_JSON=$(cat "$HISTORY_FILE")
 fi
 
 # Parse latest save file for current turn data
@@ -395,18 +385,15 @@ if [ -n "$LATEST_TMPFILE" ] && [ -s "$LATEST_TMPFILE" ]; then
   TURN=$(echo "$GAME_SECTION" | grep '^turn=' | head -1 | sed 's/turn=//')
   YEAR=$(echo "$GAME_SECTION" | grep '^year=' | head -1 | sed 's/year=//')
 
-  # Append to history if this turn isn't already there.
-  # Quick check: extract turn number from filename to avoid jq/decompression work
+  # Append the latest turn to history if it isn't there yet. Cheaper to
+  # check first than to invoke python every cron tick: we only do real
+  # work on the first cron after a turn change.
   if [ "$REBUILD_HISTORY" = "false" ]; then
     FILENAME_TURN=$(echo "$LATEST_SAVE_FILE" | sed 's/.*lt-game-\([0-9]*\)[.-].*/\1/')
     ALREADY_EXISTS=$(echo "$HISTORY_JSON" | jq --argjson t "${FILENAME_TURN:-$TURN}" '[.[] | select(.turn == $t)] | length')
     if [ "$ALREADY_EXISTS" = "0" ]; then
-      ENTRY=$(build_history_entry "$LATEST_TMPFILE")
-      PUB_EVENTS=$(extract_public_events "$LATEST_TMPFILE")
-      ENTRY=$(echo "$ENTRY" | jq --argjson ev "$PUB_EVENTS" '. + {public_events: $ev}')
-      HISTORY_JSON=$(echo "$HISTORY_JSON" | jq --argjson entry "$ENTRY" '. + [$entry]')
-      echo "$HISTORY_JSON" > "$HISTORY_FILE.tmp"
-      mv "$HISTORY_FILE.tmp" "$HISTORY_FILE"
+      python3 "$SCRIPT_DIR/python/bin/build_history.py" --save-dir "$SAVE_DIR"
+      HISTORY_JSON=$(cat "$HISTORY_FILE")
     fi
   fi
 fi
@@ -483,34 +470,20 @@ build_attendance() {
 
 if [ "$REBUILD_ATTENDANCE" = "true" ] || [ ! -f "$ATTENDANCE_FILE" ] || ! jq . "$ATTENDANCE_FILE" >/dev/null 2>&1; then
   echo "[status-json] Building attendance from all save files..."
-  ATTENDANCE_JSON=$(build_attendance)
-  echo "$ATTENDANCE_JSON" > "$ATTENDANCE_FILE.tmp"
-  mv "$ATTENDANCE_FILE.tmp" "$ATTENDANCE_FILE"
-  echo "[status-json] Built attendance for $(echo "$ATTENDANCE_JSON" | jq 'keys | length') players"
+  python3 "$SCRIPT_DIR/python/bin/build_attendance.py" --save-dir "$SAVE_DIR"
 else
   # Check if we need to update (new completed turn)
   CURRENT_TURNS=$(echo "$SAVE_FILES" | wc -l | tr -d ' ')
   COMPLETED_TURNS=$((CURRENT_TURNS - 1))
   if [ "$COMPLETED_TURNS" -gt 0 ]; then
-    ATTENDANCE_JSON=$(cat "$ATTENDANCE_FILE")
-    # Check if the latest completed turn is already tracked
-    LATEST_COMPLETED_TURN=$(echo "$SAVE_FILES" | sed '$d' | tail -1 | awk '{print $1}')
-    if [ -n "$LATEST_COMPLETED_TURN" ]; then
-      ALREADY_TRACKED=$(echo "$ATTENDANCE_JSON" | jq --argjson t "$LATEST_COMPLETED_TURN" '
-        [to_entries[].value.missed[] | select(. == $t)] | length > 0 or
-        [to_entries[].value.total_turns] | max >= $t' 2>/dev/null || echo "false")
-      # Rebuild if max total_turns is less than the number of completed turns
-      MAX_TOTAL=$(echo "$ATTENDANCE_JSON" | jq '[to_entries[].value.total_turns] | max // 0' 2>/dev/null || echo "0")
-      if [ "$MAX_TOTAL" -lt "$COMPLETED_TURNS" ] 2>/dev/null; then
-        echo "[status-json] Attendance out of date, rebuilding..."
-        ATTENDANCE_JSON=$(build_attendance)
-        echo "$ATTENDANCE_JSON" > "$ATTENDANCE_FILE.tmp"
-        mv "$ATTENDANCE_FILE.tmp" "$ATTENDANCE_FILE"
-      fi
+    MAX_TOTAL=$(jq '[to_entries[].value.total_turns] | max // 0' "$ATTENDANCE_FILE" 2>/dev/null || echo "0")
+    if [ "$MAX_TOTAL" -lt "$COMPLETED_TURNS" ] 2>/dev/null; then
+      echo "[status-json] Attendance out of date, rebuilding..."
+      python3 "$SCRIPT_DIR/python/bin/build_attendance.py" --save-dir "$SAVE_DIR"
     fi
   fi
-  ATTENDANCE_JSON=$(cat "$ATTENDANCE_FILE")
 fi
+ATTENDANCE_JSON=$(cat "$ATTENDANCE_FILE")
 
 # Symlink attendance.json into webroot for HTTP serving
 ln -sf "$ATTENDANCE_FILE" "$WEBROOT/attendance.json"
@@ -802,31 +775,11 @@ else
 fi
 
 if [ "$NEED_DIPLO_REBUILD" = "true" ]; then
+  # Full rebuild via the python builder. We dropped the bash "fast path"
+  # that updated only current relationships from the latest save —
+  # python rebuilds in ~1s, so the complexity isn't worth the bug surface.
   echo "[status-json] Building diplomacy data..."
-  DIPLOMACY_JSON=$(build_diplomacy)
-  echo "$DIPLOMACY_JSON" > "$DIPLOMACY_FILE.tmp"
-  mv "$DIPLOMACY_FILE.tmp" "$DIPLOMACY_FILE"
-  echo "[status-json] Diplomacy: $(echo "$DIPLOMACY_JSON" | jq '.current | length') active relationships, $(echo "$DIPLOMACY_JSON" | jq '.events | length') events"
-else
-  # Just update current relationships from the latest save (fast path)
-  if [ -n "${LATEST_TMPFILE:-}" ] && [ -s "$LATEST_TMPFILE" ]; then
-    CURRENT_RELS=$(extract_diplomacy "$LATEST_TMPFILE" | jq '.relationships')
-    # Check for new combat events and merge with existing
-    NEW_COMBAT=$(extract_combat_pairs "$LATEST_TMPFILE")
-    EXISTING_COMBAT=$(jq '.combat_pairs // []' "$DIPLOMACY_FILE")
-    MERGED_COMBAT=$(echo "$EXISTING_COMBAT" | jq --argjson n "$NEW_COMBAT" '. + $n | unique')
-    # Upgrade Contact → War for combat pairs
-    if [ "$(echo "$MERGED_COMBAT" | jq 'length')" -gt 0 ]; then
-      CURRENT_RELS=$(echo "$CURRENT_RELS" | jq --argjson cp "$MERGED_COMBAT" '
-        [.[] | if .status == "Contact" then
-          (.players | sort) as $sp |
-          if any($cp[]; sort == $sp) then .status = "War" else . end
-        else . end]')
-    fi
-    jq --argjson rels "$CURRENT_RELS" --argjson cp "$MERGED_COMBAT" \
-      '.current = $rels | .combat_pairs = $cp' "$DIPLOMACY_FILE" > "$DIPLOMACY_FILE.tmp"
-    mv "$DIPLOMACY_FILE.tmp" "$DIPLOMACY_FILE"
-  fi
+  python3 "$SCRIPT_DIR/python/bin/build_diplomacy.py" --save-dir "$SAVE_DIR"
 fi
 
 # Symlink diplomacy.json into webroot for HTTP serving
