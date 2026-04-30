@@ -396,9 +396,34 @@
 /* sports — era-styled athletic report */
 .gz-kind-sports { /* no background; titles + dotted result rules carry the look */ }
 .gz-kind-sports .gz-section-title { color:#3d5300; border-bottom-color:#3d5300; }
-.gz-kind-sports .gz-results { font-size:11px; line-height:1.7; color:#2a2a2a; }
-.gz-kind-sports .gz-result-row { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px dotted #ccc; }
-.gz-kind-sports .gz-result-row:last-child { border-bottom:none; }
+/* Results table — two grid columns: event name (auto-sized to widest)
+ * and outcome (flexes). Every row's columns line up because each row
+ * uses display:contents to put its two children directly into the
+ * parent grid. Match column is constrained between 180–320px so it
+ * doesn't blow out on absurdly long event names. */
+.gz-kind-sports .gz-results {
+  display:grid;
+  grid-template-columns:minmax(180px, max-content) 1fr;
+  column-gap:28px;
+  row-gap:0;
+  font-size:12px; line-height:1.5; color:#2a2a2a;
+}
+.gz-kind-sports .gz-result-row { display:contents; }
+.gz-kind-sports .gz-result-row > span {
+  padding:7px 0;
+  border-bottom:1px dotted #b7c0a3;
+}
+.gz-kind-sports .gz-result-row:last-child > span { border-bottom:none; }
+.gz-kind-sports .gz-result-row > span:first-child {
+  font-weight:700; color:#3d5300;
+  letter-spacing:0.2px;
+}
+@media(max-width:600px) {
+  /* Stack on mobile — fixed-width columns crowd a narrow viewport. */
+  .gz-kind-sports .gz-results { grid-template-columns:1fr; }
+  .gz-kind-sports .gz-result-row > span:first-child { padding-bottom:0; border-bottom:none; }
+  .gz-kind-sports .gz-result-row > span:last-child { padding-top:2px; padding-bottom:10px; }
+}
 
 /* weather / augury — multi-day forecast plus hazard outlooks */
 .gz-kind-weather { /* no background tile — section flows into the rest */ }
@@ -604,8 +629,23 @@
 .gz-xword-controls button:hover { background:#5b3a00; color:#f5f0e6; }
 
 @media(max-width:600px) {
-  .gz-xword-board { flex-direction:column; align-items:center; }
-  .gz-xword-clues { width:100%; }
+  /* Smaller squares so a 14-col grid fits a ~360px viewport. The grid
+   * uses width:max-content so it'd otherwise overflow horizontally —
+   * we wrap in an overflow-x:auto container as a fallback for the
+   * occasional very-wide layout. */
+  .gz-xword-wrap { --cell:22px; overflow-x:auto; }
+  .gz-xword > div { font-size:11px; }
+  .gz-xword-num { font-size:7px; top:1px; left:1px; }
+  .gz-xword-board { flex-direction:column; align-items:flex-start; gap:14px; }
+  .gz-xword-clues { width:100%; flex-direction:column; gap:14px; }
+  .gz-xword-cluecol { width:100%; }
+  /* Tap targets on mobile — the per-clue reveal links were tiny. */
+  .gz-xword-clue .gz-xword-reveal { font-size:11px; padding:2px 6px; }
+}
+@media(max-width:380px) {
+  /* Tighter still for small phones (iPhone SE class). */
+  .gz-xword-wrap { --cell:19px; }
+  .gz-xword > div { font-size:9.5px; }
 }
 
 /* marketplace */
