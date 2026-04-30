@@ -65,6 +65,16 @@
 
   <div class="entry">
     <div class="entry-date">April 30, 2026</div>
+    <div class="entry-title">Chronicle Polish: Marketplace Layout, Q&amp;A Styling, Letter Discretion</div>
+    <ul>
+      <li><span class="tag tag-fix">Fix</span> <strong>Marketplace no longer leaves a half-empty column</strong> — the commodities ledger now spans full-page width with a proper two-column grid (commodity name flexes, price right-aligned). Long names like "Tiger Piss (200L barrel, Antarctic grade)" wrap inside their own row instead of crashing into the price.</li>
+      <li><span class="tag tag-fix">Fix</span> <strong>Interview emphasis no longer hijacked as a Q&amp;A label</strong> — italic phrases at the start of an interview paragraph used to render as a brown small-caps block (the "asking a newspaper for intelligence" line on its own line in turn 60). The Q&amp;A label styling now requires explicit opt-in via <code>&lt;em class="q"&gt;</code>; plain <code>&lt;em&gt;</code> stays italic and inline.</li>
+      <li><span class="tag tag-improve">Improve</span> <strong>Letters column more discriminating</strong> — the gazette prompt now distinguishes "letter material" (public-facing rhetoric meant to be read by other leaders) from "inquiry material" (private DMs to the editor asking for info or favors). Inquiry material gets paraphrased in the editorial body if newsworthy, not reprinted as a letter. Also: no double-publishing the same correspondence in both an interview AND letters.</li>
+    </ul>
+  </div>
+
+  <div class="entry">
+    <div class="entry-date">April 30, 2026</div>
     <div class="entry-title">Civ Chronicle v2: Multi-Page Broadsheet</div>
     <ul>
       <li><span class="tag tag-new">New</span> <strong>Multi-page newspaper layout</strong> — the gazette renders as a broadsheet with a lead story, columns, opinion pieces, breaking news, sports, classifieds, corrections, and more. Sections flow into each other in a magazine-style two-column layout instead of one long article.</li>

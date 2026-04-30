@@ -165,7 +165,8 @@
 .gazette-page > .gz-kind-weather,
 .gazette-page > .gz-kind-augury,
 .gazette-page > .gz-kind-sports,
-.gazette-page > .gz-kind-serial_fiction {
+.gazette-page > .gz-kind-serial_fiction,
+.gazette-page > .gz-kind-marketplace {
   column-span:all;
   -webkit-column-span:all;
 }
@@ -350,8 +351,11 @@
   margin:4px 0 2px; font-style:normal;
 }
 .gz-kind-interview .gz-body p { font-size:13px; line-height:1.6; margin:0 0 10px; }
-/* Style Q: prefix in italic content as bold sans-serif label */
-.gz-kind-interview .gz-body p em:first-child {
+/* Q&A label, opt-in via <em class="q">. Renders as a bold small-caps
+ * brown line — used to mark the question prefix in interview Q&A.
+ * Plain <em> stays italic and inline (so the AI can use italics for
+ * regular emphasis or pull-quotes without triggering label styling). */
+.gz-kind-interview .gz-body em.q {
   display:block; font-style:normal; font-weight:700; font-size:11px;
   letter-spacing:1.5px; text-transform:uppercase; color:#5b3a00;
   margin-bottom:2px;
@@ -648,9 +652,33 @@
   .gz-xword > div { font-size:9.5px; }
 }
 
-/* marketplace */
-.gz-kind-marketplace .gz-market-row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dotted #ccc; font-size:11px; }
-.gz-kind-marketplace .gz-market-row:last-child { border-bottom:none; }
+/* marketplace — full-width tabular ledger. Two-column grid with the
+ * commodity name flexing and the price aligned to the right; long names
+ * wrap inside their cell instead of crashing into the price. */
+.gz-kind-marketplace .gz-market-rows {
+  display:grid;
+  grid-template-columns:1fr max-content;
+  column-gap:24px;
+  row-gap:0;
+  font-size:11.5px; line-height:1.5;
+}
+.gz-kind-marketplace .gz-market-row { display:contents; }
+.gz-kind-marketplace .gz-market-row > span {
+  padding:5px 0;
+  border-bottom:1px dotted #ccc;
+}
+.gz-kind-marketplace .gz-market-row:last-child > span { border-bottom:none; }
+.gz-kind-marketplace .gz-market-row > span:last-child {
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+  color:#5b3a00; font-weight:600;
+}
+@media(max-width:600px) {
+  .gz-kind-marketplace .gz-market-rows { grid-template-columns:1fr; }
+  .gz-kind-marketplace .gz-market-row > span:first-child { padding-bottom:0; border-bottom:none; }
+  .gz-kind-marketplace .gz-market-row > span:last-child { padding-top:2px; padding-bottom:8px; text-align:left; }
+}
 
 /* corrections — red title */
 .gz-kind-corrections { /* no background — title underline + small italic body carries the look */ font-size:10.5px; }

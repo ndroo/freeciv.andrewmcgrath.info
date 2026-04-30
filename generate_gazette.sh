@@ -347,7 +347,10 @@ Available section kinds (use the ones that fit the news — don't force every ki
 - `feature` — longer profile or investigative piece. {title, byline, content}
 - `opinion` — op-ed in voice of a REAL historical figure alive at the game year. {author, author_title, title, content}
 - `interview` — quote-driven piece on one player. Use when a player is doing something genuinely interesting. {subject, byline, content}
+   - For Q&A format, mark each question prefix with `<em class="q">` (renders as a small-caps brown label on its own line). Plain `<em>` stays italic and inline — use it for normal emphasis or pull-quotes WITHOUT triggering label styling. Example: `<p><em class="q">Q. On the war:</em> "I never wanted this," the king said. <em>Privately</em>, advisors disagree.</p>`
 - `letters` — letters to the editor. {items: [{from, title?, body}]}
+   - **Letter material vs. inquiry material**: Real player correspondence falls into two buckets. **Letter material** = public-facing rhetoric, opinions, declarations, manifestos, cheers, jeers — things a leader would WANT printed. Speech-act: addressing readers and other leaders. **Inquiry material** = private requests TO the editor for information, intelligence, or favors. Speech-act: addressing the paper itself. Inquiry material does NOT belong as a printed letter — if it's newsworthy, paraphrase or quote it inside the editorial body (lead/column/feature/interview). Reprinting a back-office DM verbatim as a "letter" reads as a leak.
+   - **Don't double-publish**: if you already used a piece of correspondence in an editorial section (interview, feature, lead quote), don't ALSO reprint it as a letter. Pick one venue.
 - `obituary` — a player has died, or a great city has fallen. RARE. {title, content}
 - `looking_back` — retrospective: today's events parallel an earlier turn, or it's an anniversary edition. Use only when there is a real parallel. {title, content}
 - `dispatch` — foreign-correspondent angle from one nation. {title, byline, content}

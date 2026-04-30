@@ -982,7 +982,8 @@
         return '<div class="gz-market-row"><span>' + esc(it.commodity || it.name || '') + '</span><span>' + esc(it.price || '') + '</span></div>';
       }).join('');
       return '<section class="gz-section gz-kind-marketplace">' +
-        '<h3 class="gz-section-title">' + esc(s.title || 'Marketplace') + '</h3>' + rows +
+        '<h3 class="gz-section-title">' + esc(s.title || 'Marketplace') + '</h3>' +
+        '<div class="gz-market-rows">' + rows + '</div>' +
       '</section>';
     }
     function tplAds(s) {
